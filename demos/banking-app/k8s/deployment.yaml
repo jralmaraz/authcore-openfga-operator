@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: banking-demo-app
+  namespace: default
+  labels:
+    app: banking-demo
+    component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: banking-demo
+      component: api
+  template:
+    metadata:
+      labels:
+        app: banking-demo
+        component: api
+    spec:
+      containers:
+      - name: banking-api
+        image: banking-demo:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: PORT
+          value: "3000"
+        - name: NODE_ENV
+          value: "production"
+        - name: OPENFGA_API_URL
+          value: "http://openfga-basic:8080"
+        - name: OPENFGA_STORE_ID
+          valueFrom:
+            secretKeyRef:
+              name: banking-demo-config
+              key: store-id
+        - name: OPENFGA_AUTH_MODEL_ID
+          valueFrom:
+            secretKeyRef:
+              name: banking-demo-config
+              key: auth-model-id
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: banking-demo-service
+  namespace: default
+  labels:
+    app: banking-demo
+spec:
+  selector:
+    app: banking-demo
+    component: api
+  ports:
+  - port: 80
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: banking-demo-config
+  namespace: default
+type: Opaque
+stringData:
+  store-id: ""  # Will be populated after setup
+  auth-model-id: ""  # Will be populated after setup

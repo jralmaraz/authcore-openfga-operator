@@ -48,6 +48,11 @@ The OpenFGA Operator provides a Kubernetes-native way to deploy and manage OpenF
 - **Live Demo**: [AuthCore Demo](docs/authcore-website/index.html) - Interactive demonstration
 - **Stakeholder Presentation**: Comprehensive demo for business stakeholders
 
+### 🎯 Demo Applications
+- **[Banking Application Demo](demos/banking-app/)**: Complete banking microservice with fine-grained authorization
+- **[GenAI RAG Agent Demo](demos/genai-rag-agent/)**: AI-powered RAG agent with OpenFGA authorization
+- **[Demo Overview](demos/README.md)**: Introduction to all demonstration applications
+
 ## Prerequisites
 
 - Kubernetes cluster (v1.20+)
