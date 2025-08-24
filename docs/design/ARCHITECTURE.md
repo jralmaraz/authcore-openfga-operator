@@ -356,7 +356,6 @@ data:
 
 ### Research Areas
 - **Machine Learning**: ML-based anomaly detection and optimization
-- **Quantum Security**: Post-quantum cryptography integration
 - **Edge Computing**: Edge deployment optimization
 - **Sustainability**: Green computing and energy efficiency
 

@@ -205,7 +205,6 @@ Security Stack:
 - Disaster recovery automation
 
 ### Q4 2024 - Next Generation (v2.0.0) 🔬
-- Quantum-ready security
 - Edge computing optimization
 - Service mesh native integration
 - Advanced AI capabilities
@@ -336,9 +335,8 @@ To establish the OpenFGA Operator as the industry standard for secure, scalable,
 
 ### Innovation Areas
 1. **Artificial Intelligence**: AI-powered security and optimization
-2. **Quantum Computing**: Quantum-safe cryptography and security
-3. **Edge Computing**: Optimized edge deployment capabilities
-4. **Sustainability**: Green computing and energy efficiency
+2. **Edge Computing**: Optimized edge deployment capabilities
+3. **Sustainability**: Green computing and energy efficiency
 
 ### Technology Trends
 - **Zero Trust Architecture**: Advanced zero trust security implementation
