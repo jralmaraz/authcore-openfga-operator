@@ -2,24 +2,99 @@
 /target/
 Cargo.lock
 
-# IDE
-.vscode/
-.idea/
+# Go binaries and tools
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+testbin/
+Dockerfile.cross
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Kubernetes Generated files - skip generated files, except for vendored files
+!vendor/**/zz_generated.*
+
+# IDE and editor files
+.idea
 *.swp
 *.swo
 *~
+.vscode/
+*.iml
 
-# OS
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
 
-# Kubernetes
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Build artifacts
+dist/
+build/
+out/
+./dist/
+./build/
+
+# Dependency directories
+vendor/
+node_modules/
+
+# Go workspace file
+go.work
+
+# Controller-gen and other tools
+bin/controller-gen
+bin/kustomize
+bin/setup-envtest
+
+# Test coverage files
+cover.out
+coverage.txt
+
+# Local development files
+.env
+.env.local
+*.local
+
+# Helm charts (if added later)
+charts/*/charts/
+charts/*/requirements.lock
+
+# Log files
+*.log
+logs/
+
+# Docker artifacts
+.dockerignore
+
+# Kubernetes manifests and configs
+*secret*.yaml
+*Secret*.yaml
 *.kubeconfig
 kubeconfig
 
-# Logs
-*.log
+# Generated manifests (except samples)
+config/crd/patches/
+config/webhook/
+config/certmanager/
+config/prometheus/
+config/default/manager_auth_proxy_patch.yaml
 
-# Build artifacts
-/dist/
-/build/
+# Local testing artifacts
+kind-config.yaml

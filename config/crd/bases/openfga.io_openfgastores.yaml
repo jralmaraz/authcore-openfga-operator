@@ -1,0 +1,548 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
+  name: openfgastores.openfga.io
+spec:
+  group: openfga.io
+  names:
+    kind: OpenFGAStore
+    listKind: OpenFGAStoreList
+    plural: openfgastores
+    singular: openfgastore
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.storeID
+      name: Store ID
+      type: string
+    - jsonPath: .status.tupleCount
+      name: Tuples
+      type: integer
+    - jsonPath: .status.modelCount
+      name: Models
+      type: integer
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    - jsonPath: .status.lastBackup
+      name: Last Backup
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: OpenFGAStore is the Schema for the openfgastores API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object.'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents.'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: OpenFGAStoreSpec defines the desired state of OpenFGAStore
+            properties:
+              accessControl:
+                description: AccessControl defines access control settings for the
+                  store
+                properties:
+                  allowedGroups:
+                    description: AllowedGroups lists the groups that can access this
+                      store
+                    items:
+                      type: string
+                    type: array
+                  allowedServiceAccounts:
+                    description: AllowedServiceAccounts lists the service accounts
+                      that can access this store
+                    items:
+                      type: string
+                    type: array
+                  allowedUsers:
+                    description: AllowedUsers lists the users that can access this
+                      store
+                    items:
+                      type: string
+                    type: array
+                  enabled:
+                    default: true
+                    description: Enabled indicates whether access control is enabled
+                    type: boolean
+                  networkPolicies:
+                    description: NetworkPolicies defines network access policies
+                    items:
+                      description: NetworkPolicyRule defines a network policy rule
+                      properties:
+                        from:
+                          description: From defines the source of the rule
+                          items:
+                            description: NetworkPolicyPeer defines a network policy
+                              peer
+                            properties:
+                              ipBlock:
+                                description: IPBlock defines an IP block
+                                properties:
+                                  cidr:
+                                    description: CIDR is the IP block in CIDR notation
+                                    type: string
+                                  except:
+                                    description: Except is a list of IP ranges to
+                                      exclude
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - cidr
+                                type: object
+                              namespaceSelector:
+                                description: NamespaceSelector selects namespaces
+                                type: object
+                              podSelector:
+                                description: PodSelector selects pods
+                                type: object
+                            type: object
+                          type: array
+                        ports:
+                          description: Ports defines the allowed ports
+                          items:
+                            description: NetworkPolicyPort defines a port for network
+                              policies
+                            properties:
+                              endPort:
+                                description: EndPort is the end of a port range
+                                format: int32
+                                type: integer
+                              port:
+                                description: Port is the port number or name
+                                format: int32
+                                type: integer
+                              protocol:
+                                description: Protocol is the network protocol (TCP,
+                                  UDP, SCTP)
+                                type: string
+                            type: object
+                          type: array
+                        to:
+                          description: To defines the destination of the rule
+                          items:
+                            description: NetworkPolicyPeer defines a network policy
+                              peer
+                            properties:
+                              ipBlock:
+                                description: IPBlock defines an IP block
+                                properties:
+                                  cidr:
+                                    description: CIDR is the IP block in CIDR notation
+                                    type: string
+                                  except:
+                                    description: Except is a list of IP ranges to
+                                      exclude
+                                    items:
+                                      type: string
+                                    type: array
+                                required:
+                                - cidr
+                                type: object
+                              namespaceSelector:
+                                description: NamespaceSelector selects namespaces
+                                type: object
+                              podSelector:
+                                description: PodSelector selects pods
+                                type: object
+                            type: object
+                          type: array
+                      type: object
+                    type: array
+                  rbacRules:
+                    description: RBACRules defines RBAC rules for the store
+                    items:
+                      description: RBACRule defines an RBAC rule for store access
+                      properties:
+                        conditions:
+                          additionalProperties:
+                            type: string
+                          description: Conditions are additional conditions for the
+                            rule
+                          type: object
+                        permissions:
+                          description: Permissions are the permissions granted to the
+                            subjects
+                          items:
+                            type: string
+                          minItems: 1
+                          type: array
+                        resources:
+                          description: Resources are the resources this rule applies
+                            to
+                          items:
+                            type: string
+                          type: array
+                        subjects:
+                          description: Subjects are the users, groups, or service accounts
+                            this rule applies to
+                          items:
+                            description: RBACSubject defines a subject for RBAC rules
+                            properties:
+                              kind:
+                                description: Kind is the kind of subject (User, Group,
+                                  ServiceAccount)
+                                enum:
+                                - User
+                                - Group
+                                - ServiceAccount
+                                type: string
+                              name:
+                                description: Name is the name of the subject
+                                type: string
+                              namespace:
+                                description: Namespace is the namespace of the subject
+                                  (for ServiceAccount)
+                                type: string
+                            required:
+                            - kind
+                            - name
+                            type: object
+                          minItems: 1
+                          type: array
+                      required:
+                      - permissions
+                      - subjects
+                      type: object
+                    type: array
+                type: object
+              annotations:
+                additionalProperties:
+                  type: string
+                description: Annotations to be applied to the store
+                type: object
+              backup:
+                description: Backup configuration for the store
+                properties:
+                  compression:
+                    default: true
+                    description: Compression indicates whether backups should be compressed
+                    type: boolean
+                  enabled:
+                    default: false
+                    description: Enabled indicates whether backups are enabled
+                    type: boolean
+                  encryption:
+                    description: Encryption configuration for backups
+                    properties:
+                      algorithm:
+                        description: Algorithm is the encryption algorithm to use
+                        enum:
+                        - AES256
+                        - AES128
+                        - ChaCha20Poly1305
+                        type: string
+                      enabled:
+                        default: false
+                        description: Enabled indicates whether encryption is enabled
+                        type: boolean
+                      keySecret:
+                        description: KeySecret contains the reference to the secret
+                          containing the encryption key
+                        properties:
+                          key:
+                            description: The key of the secret to select from.  Must
+                              be a valid secret key.
+                            type: string
+                          name:
+                            description: 'Name of the referent.'
+                            type: string
+                          optional:
+                            description: Specify whether the Secret or its key must
+                              be defined
+                            type: boolean
+                        required:
+                        - key
+                        type: object
+                        x-kubernetes-map-type: atomic
+                    type: object
+                  retentionCount:
+                    description: RetentionCount is the number of backups to retain
+                    format: int32
+                    maximum: 100
+                    minimum: 1
+                    type: integer
+                  schedule:
+                    description: Schedule defines the backup schedule in cron format
+                    pattern: ^(@(annually|yearly|monthly|weekly|daily|hourly|reboot))|(@every
+                      (\d+(ns|us|µs|ms|s|m|h))+)|((((\\d+,)+\\d+|(\\d+([/\\-]\\d+)?)|\\*)
+                      ){4,6}(((\\d+,)+\\d+|(\\d+([/\\-]\\d+)?)|\\*)( |$)))$
+                    type: string
+                  storageClass:
+                    description: StorageClass for backup persistent volumes
+                    type: string
+                  storageSize:
+                    description: StorageSize for backup persistent volumes
+                    type: string
+                type: object
+              description:
+                description: Description provides additional information about the
+                  store
+                type: string
+              displayName:
+                description: DisplayName is a human-readable name for the store
+                type: string
+              labels:
+                additionalProperties:
+                  type: string
+                description: Labels to be applied to the store
+                type: object
+              metrics:
+                description: Metrics configuration for the store
+                properties:
+                  customMetrics:
+                    description: CustomMetrics defines custom metrics to collect
+                    items:
+                      description: CustomMetric defines a custom metric to collect
+                      properties:
+                        description:
+                          description: Description provides a description of the metric
+                          type: string
+                        labels:
+                          additionalProperties:
+                            type: string
+                          description: Labels are additional labels for the metric
+                          type: object
+                        name:
+                          description: Name is the name of the metric
+                          type: string
+                        type:
+                          description: Type is the type of metric (counter, gauge,
+                            histogram)
+                          enum:
+                          - counter
+                          - gauge
+                          - histogram
+                          type: string
+                      required:
+                      - name
+                      - type
+                      type: object
+                    type: array
+                  enabled:
+                    default: true
+                    description: Enabled indicates whether metrics collection is enabled
+                    type: boolean
+                  interval:
+                    default: 30s
+                    description: Interval defines the metrics collection interval
+                    type: string
+                  prometheusConfig:
+                    description: PrometheusConfig defines Prometheus-specific configuration
+                    properties:
+                      additionalLabels:
+                        additionalProperties:
+                          type: string
+                        description: AdditionalLabels are additional labels for Prometheus
+                          metrics
+                        type: object
+                      serviceMonitor:
+                        default: true
+                        description: ServiceMonitor indicates whether a ServiceMonitor
+                          should be created
+                        type: boolean
+                      serviceMonitorLabels:
+                        additionalProperties:
+                          type: string
+                        description: Labels for the ServiceMonitor
+                        type: object
+                      serviceMonitorNamespace:
+                        description: Namespace for the ServiceMonitor
+                        type: string
+                    type: object
+                type: object
+              openTelemetry:
+                description: OpenTelemetry configuration for observability
+                properties:
+                  enabled:
+                    default: true
+                    description: Enabled indicates whether OpenTelemetry is enabled
+                    type: boolean
+                  endpoint:
+                    description: Endpoint for the OpenTelemetry collector
+                    type: string
+                  headers:
+                    additionalProperties:
+                      type: string
+                    description: Headers to add to OpenTelemetry exports
+                    type: object
+                  samplingRate:
+                    description: SamplingRate for traces (0.0 to 1.0)
+                    maximum: 1
+                    minimum: 0
+                    type: number
+                  serviceName:
+                    description: ServiceName for OpenTelemetry traces
+                    type: string
+                type: object
+              retentionPolicy:
+                description: RetentionPolicy defines the data retention policy for
+                  the store
+                properties:
+                  autoCleanup:
+                    default: true
+                    description: AutoCleanup indicates whether automatic cleanup should
+                      be performed
+                    type: boolean
+                  enabled:
+                    default: false
+                    description: Enabled indicates whether data retention is enabled
+                    type: boolean
+                  logRetentionDays:
+                    description: LogRetentionDays defines how long audit logs should
+                      be retained
+                    format: int32
+                    maximum: 3650
+                    minimum: 1
+                    type: integer
+                  modelRetentionDays:
+                    description: ModelRetentionDays defines how long authorization
+                      models should be retained
+                    format: int32
+                    maximum: 3650
+                    minimum: 1
+                    type: integer
+                  tupleRetentionDays:
+                    description: TupleRetentionDays defines how long tuples should
+                      be retained
+                    format: int32
+                    maximum: 3650
+                    minimum: 1
+                    type: integer
+                type: object
+              serverRef:
+                description: ServerRef is a reference to the OpenFGAServer where this
+                  store will be created
+                properties:
+                  endpoint:
+                    description: Endpoint is the direct endpoint URL (alternative
+                      to Name/Namespace)
+                    type: string
+                  name:
+                    description: Name is the name of the OpenFGAServer resource
+                    type: string
+                  namespace:
+                    description: Namespace is the namespace of the OpenFGAServer resource
+                    type: string
+                required:
+                - name
+                type: object
+            required:
+            - serverRef
+            type: object
+          status:
+            description: OpenFGAStoreStatus defines the observed state of OpenFGAStore
+            properties:
+              backupStatus:
+                description: BackupStatus provides information about backup status
+                type: string
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the store's current state
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource."
+                  properties:
+                    lastTransitionTime:
+                      description: lastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: message is a human readable message indicating
+                        details about the transition.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: observedGeneration represents the .metadata.generation
+                        that the condition was set based upon.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: reason contains a programmatic identifier indicating
+                        the reason for the condition's last transition.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              createdAt:
+                description: CreatedAt is the timestamp when the store was created
+                format: date-time
+                type: string
+              lastBackup:
+                description: LastBackup is the timestamp of the last successful backup
+                format: date-time
+                type: string
+              lastReconcileTime:
+                description: LastReconcileTime is the last time the resource was reconciled
+                format: date-time
+                type: string
+              metricsEndpoint:
+                description: MetricsEndpoint is the endpoint where metrics are available
+                type: string
+              modelCount:
+                description: ModelCount is the number of authorization models in the
+                  store
+                format: int32
+                type: integer
+              observedGeneration:
+                description: ObservedGeneration reflects the generation of the most
+                  recently observed OpenFGAStore
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current phase of the store
+                enum:
+                - Pending
+                - Ready
+                - Failed
+                - Unknown
+                type: string
+              storeID:
+                description: StoreID is the ID of the store in OpenFGA
+                type: string
+              tupleCount:
+                description: TupleCount is the approximate number of tuples in the
+                  store
+                format: int64
+                type: integer
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

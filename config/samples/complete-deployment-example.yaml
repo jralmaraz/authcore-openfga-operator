@@ -1,0 +1,666 @@
+# Complete OpenFGA deployment example with PostgreSQL database
+---
+# Namespace for the OpenFGA deployment
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openfga-system
+  labels:
+    app.kubernetes.io/name: openfga-system
+    app.kubernetes.io/component: namespace
+
+---
+# PostgreSQL database for OpenFGA
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: openfga-system
+  labels:
+    app: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15
+        env:
+        - name: POSTGRES_DB
+          value: openfga
+        - name: POSTGRES_USER
+          value: openfga
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: password
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: openfga-system
+  labels:
+    app: postgres
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: postgres
+
+---
+# PostgreSQL PVC
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: openfga-system
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# PostgreSQL credentials secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgres-credentials
+  namespace: openfga-system
+type: Opaque
+data:
+  password: b3BlbmZnYXBhc3N3b3Jk  # base64 encoded "openfgapassword"
+
+---
+# Backup encryption key secret
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backup-encryption-key
+  namespace: openfga-system
+type: Opaque
+data:
+  encryption-key: YmFja3VwZW5jcnlwdGlvbmtleQ==  # base64 encoded "backupencryptionkey"
+
+---
+# Service account for OpenFGA server
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openfga-server
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: openfga-server
+    app.kubernetes.io/component: service-account
+
+---
+# OpenFGA Server
+apiVersion: openfga.io/v1alpha1
+kind: OpenFGAServer
+metadata:
+  name: openfga-server
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: openfgaserver
+    app.kubernetes.io/instance: openfga-server
+    app.kubernetes.io/part-of: openfga-operator
+    environment: production
+spec:
+  image: openfga/openfga:v1.4.3
+  replicas: 3
+  port: 8080
+  grpcPort: 8081
+  
+  database:
+    type: postgres
+    host: postgres-service
+    port: 5432
+    database: openfga
+    username: openfga
+    passwordSecret:
+      name: postgres-credentials
+      key: password
+    sslMode: disable  # Use 'require' in production
+    maxOpenConns: 30
+    maxIdleConns: 10
+  
+  config:
+    logLevel: info
+    logFormat: json
+    maxTuplesPerWrite: 100
+    maxAuthorizationModelSizeInBytes: 262144
+    playgroundEnabled: false
+    
+    httpConfig:
+      readTimeout: 30s
+      writeTimeout: 30s
+      idleTimeout: 120s
+      readHeaderTimeout: 10s
+      corsAllowedOrigins:
+        - "https://app.example.com"
+        - "https://admin.example.com"
+      corsAllowedHeaders:
+        - "Content-Type"
+        - "Authorization"
+        - "X-Request-ID"
+    
+    grpcConfig:
+      enabled: true
+      tlsConfig:
+        enabled: false  # Enable TLS in production
+  
+  openTelemetry:
+    enabled: true
+    serviceName: openfga-server
+    endpoint: http://otel-collector.monitoring:4317
+    samplingRate: 0.1
+    headers:
+      x-environment: "production"
+      x-service-version: "v1.4.3"
+  
+  networkPolicy:
+    enabled: true
+    allowedIngress:
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                name: application
+          - namespaceSelector:
+              matchLabels:
+                name: api-gateway
+        ports:
+          - port: 8080
+            protocol: TCP
+          - port: 8081
+            protocol: TCP
+    ciliumLabels:
+      app: openfga-server
+      version: v1
+      environment: production
+  
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  
+  serviceAccountName: openfga-server
+  
+  nodeSelector:
+    kubernetes.io/arch: amd64
+    node-type: application
+  
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "openfga"
+      effect: "NoSchedule"
+  
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - openfgaserver
+            topologyKey: kubernetes.io/hostname
+        - weight: 50
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - openfgaserver
+            topologyKey: topology.kubernetes.io/zone
+
+---
+# OpenFGA Store for main application
+apiVersion: openfga.io/v1alpha1
+kind: OpenFGAStore
+metadata:
+  name: main-application-store
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: openfgastore
+    app.kubernetes.io/instance: main-application-store
+    app.kubernetes.io/part-of: openfga-operator
+    environment: production
+    team: platform
+spec:
+  serverRef:
+    name: openfga-server
+    namespace: openfga-system
+  
+  displayName: "Main Application Authorization Store"
+  description: "Primary authorization store for the main application services"
+  
+  retentionPolicy:
+    enabled: true
+    tupleRetentionDays: 90
+    modelRetentionDays: 365
+    logRetentionDays: 30
+    autoCleanup: true
+  
+  accessControl:
+    enabled: true
+    allowedServiceAccounts:
+      - "application-api-service"
+      - "user-service"
+      - "admin-service"
+    allowedUsers:
+      - "admin@example.com"
+      - "platform-team@example.com"
+    allowedGroups:
+      - "platform-admins"
+      - "application-developers"
+    
+    rbacRules:
+      - subjects:
+          - kind: User
+            name: "admin@example.com"
+          - kind: Group
+            name: "platform-admins"
+        permissions:
+          - "read"
+          - "write"
+          - "admin"
+        resources:
+          - "tuples"
+          - "models"
+          - "stores"
+        conditions:
+          source: "trusted-network"
+      - subjects:
+          - kind: ServiceAccount
+            name: "application-api-service"
+            namespace: "application"
+        permissions:
+          - "read"
+          - "write"
+        resources:
+          - "tuples"
+        conditions:
+          environment: "production"
+  
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retentionCount: 30
+    storageClass: "fast-ssd"
+    storageSize: "50Gi"
+    compression: true
+    encryption:
+      enabled: true
+      algorithm: "AES256"
+      keySecret:
+        name: "backup-encryption-key"
+        key: "encryption-key"
+  
+  metrics:
+    enabled: true
+    interval: "30s"
+    customMetrics:
+      - name: "store_tuple_operations_total"
+        type: "counter"
+        description: "Total number of tuple operations by type"
+        labels:
+          operation: "write"
+          store: "main-application"
+      - name: "store_authorization_requests_total"
+        type: "counter"
+        description: "Total number of authorization check requests"
+        labels:
+          result: "allowed"
+          store: "main-application"
+      - name: "store_model_evaluations_duration_seconds"
+        type: "histogram"
+        description: "Duration of authorization model evaluations"
+        labels:
+          model_type: "main"
+    
+    prometheusConfig:
+      serviceMonitor: true
+      serviceMonitorNamespace: "monitoring"
+      serviceMonitorLabels:
+        release: "prometheus-operator"
+        team: "platform"
+      additionalLabels:
+        environment: "production"
+        component: "authorization"
+        criticality: "high"
+  
+  openTelemetry:
+    enabled: true
+    serviceName: "openfga-store-main"
+    endpoint: "http://otel-collector.monitoring:4317"
+    samplingRate: 0.1
+    headers:
+      x-service-version: "v1.0.0"
+      x-environment: "production"
+      x-team: "platform"
+  
+  labels:
+    environment: "production"
+    team: "platform"
+    component: "authorization"
+    criticality: "high"
+    backup-enabled: "true"
+  
+  annotations:
+    description: "Main authorization store for application services"
+    contact: "platform-team@example.com"
+    documentation: "https://docs.example.com/authorization"
+    oncall: "platform-oncall@example.com"
+
+---
+# Authorization Model for the main application
+apiVersion: openfga.io/v1alpha1
+kind: AuthorizationModel
+metadata:
+  name: main-application-model
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: authorizationmodel
+    app.kubernetes.io/instance: main-application-model
+    app.kubernetes.io/part-of: openfga-operator
+    model-version: "v1.0"
+    environment: production
+spec:
+  storeRef:
+    name: main-application-store
+    namespace: openfga-system
+    serverRef:
+      name: openfga-server
+      namespace: openfga-system
+  
+  schemaVersion: "1.1"
+  
+  schema:
+    type_definitions:
+      # Base user type
+      - type: "user"
+        relations: {}
+      
+      # Organization management
+      - type: "organization"
+        relations:
+          member:
+            this: {}
+          admin:
+            this: {}
+          owner:
+            this: {}
+          billing_admin:
+            this: {}
+      
+      # Team management within organizations
+      - type: "team"
+        relations:
+          member:
+            this: {}
+          lead:
+            this: {}
+          parent_org:
+            this: {}
+          org_member:
+            tupleToUserset:
+              tupleSet:
+                relation: "parent_org"
+              computedUserset:
+                object: ""
+                relation: "member"
+      
+      # Repository/Project management
+      - type: "repository"
+        relations:
+          owner:
+            this: {}
+          admin:
+            this: {}
+          maintainer:
+            this: {}
+          contributor:
+            this: {}
+          reader:
+            union:
+              children:
+                - this: {}
+                - computedUserset:
+                    object: ""
+                    relation: "contributor"
+                - computedUserset:
+                    object: ""
+                    relation: "maintainer"
+                - computedUserset:
+                    object: ""
+                    relation: "admin"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          writer:
+            union:
+              children:
+                - this: {}
+                - computedUserset:
+                    object: ""
+                    relation: "contributor"
+                - computedUserset:
+                    object: ""
+                    relation: "maintainer"
+                - computedUserset:
+                    object: ""
+                    relation: "admin"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          parent_org:
+            this: {}
+          parent_team:
+            this: {}
+          org_member:
+            tupleToUserset:
+              tupleSet:
+                relation: "parent_org"
+              computedUserset:
+                object: ""
+                relation: "member"
+          team_member:
+            tupleToUserset:
+              tupleSet:
+                relation: "parent_team"
+              computedUserset:
+                object: ""
+                relation: "member"
+      
+      # Document/File management
+      - type: "document"
+        relations:
+          owner:
+            this: {}
+          editor:
+            this: {}
+          commenter:
+            this: {}
+          viewer:
+            union:
+              children:
+                - this: {}
+                - computedUserset:
+                    object: ""
+                    relation: "commenter"
+                - computedUserset:
+                    object: ""
+                    relation: "editor"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          can_read:
+            computedUserset:
+              object: ""
+              relation: "viewer"
+          can_write:
+            union:
+              children:
+                - computedUserset:
+                    object: ""
+                    relation: "editor"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          can_comment:
+            union:
+              children:
+                - computedUserset:
+                    object: ""
+                    relation: "commenter"
+                - computedUserset:
+                    object: ""
+                    relation: "editor"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          can_delete:
+            computedUserset:
+              object: ""
+              relation: "owner"
+          can_share:
+            union:
+              children:
+                - computedUserset:
+                    object: ""
+                    relation: "editor"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          parent_folder:
+            this: {}
+          inherited_viewer:
+            tupleToUserset:
+              tupleSet:
+                relation: "parent_folder"
+              computedUserset:
+                object: ""
+                relation: "viewer"
+      
+      # Folder/Directory management
+      - type: "folder"
+        relations:
+          owner:
+            this: {}
+          manager:
+            this: {}
+          editor:
+            this: {}
+          viewer:
+            union:
+              children:
+                - this: {}
+                - computedUserset:
+                    object: ""
+                    relation: "editor"
+                - computedUserset:
+                    object: ""
+                    relation: "manager"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          can_read:
+            computedUserset:
+              object: ""
+              relation: "viewer"
+          can_write:
+            union:
+              children:
+                - computedUserset:
+                    object: ""
+                    relation: "editor"
+                - computedUserset:
+                    object: ""
+                    relation: "manager"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          can_delete:
+            union:
+              children:
+                - computedUserset:
+                    object: ""
+                    relation: "manager"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          can_create_child:
+            union:
+              children:
+                - computedUserset:
+                    object: ""
+                    relation: "editor"
+                - computedUserset:
+                    object: ""
+                    relation: "manager"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          can_manage_permissions:
+            union:
+              children:
+                - computedUserset:
+                    object: ""
+                    relation: "manager"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          parent_folder:
+            this: {}
+  
+  conditions:
+    ip_allowlist: "request.source_ip in allowed_ip_ranges"
+    business_hours: "request.time >= 09:00 && request.time <= 17:00"
+    weekdays_only: "request.day_of_week >= 1 && request.day_of_week <= 5"
+    mfa_required: "user.mfa_verified == true"
+  
+  openTelemetry:
+    enabled: true
+    serviceName: "authorization-model-main"
+    endpoint: "http://otel-collector.monitoring:4317"
+    samplingRate: 0.2
+    headers:
+      x-model-version: "v1.0"
+      x-environment: "production"
+      x-team: "platform"
