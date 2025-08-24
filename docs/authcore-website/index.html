@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AuthCore - Next-Generation Authorization Infrastructure</title>
+    <meta name="description" content="AuthCore powered by OpenFGA Operator - Secure, scalable, and developer-friendly authorization infrastructure for modern applications.">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="header">
+        <nav class="navbar">
+            <div class="nav-container">
+                <div class="nav-brand">
+                    <img src="assets/authcore-logo.svg" alt="AuthCore" class="logo">
+                    <span class="brand-text">AuthCore</span>
+                </div>
+                <div class="nav-menu" id="nav-menu">
+                    <a href="#home" class="nav-link">Home</a>
+                    <a href="#features" class="nav-link">Features</a>
+                    <a href="#security" class="nav-link">Security</a>
+                    <a href="#docs" class="nav-link">Documentation</a>
+                    <a href="#about" class="nav-link">About</a>
+                    <a href="#contact" class="nav-link">Contact</a>
+                </div>
+                <div class="nav-actions">
+                    <a href="https://github.com/jralmaraz/Openfga-operator" class="btn btn-outline">GitHub</a>
+                    <a href="#get-started" class="btn btn-primary">Get Started</a>
+                </div>
+                <div class="nav-toggle" id="nav-toggle">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Hero Section -->
+        <section id="home" class="hero">
+            <div class="container">
+                <div class="hero-content">
+                    <div class="hero-text">
+                        <h1 class="hero-title">
+                            Next-Generation 
+                            <span class="gradient-text">Authorization Infrastructure</span>
+                        </h1>
+                        <p class="hero-subtitle">
+                            AuthCore delivers enterprise-grade authorization systems with unparalleled security, 
+                            powered by the OpenFGA Operator. Deploy fine-grained authorization with confidence 
+                            in any Kubernetes environment.
+                        </p>
+                        <div class="hero-actions">
+                            <a href="#get-started" class="btn btn-primary btn-large">
+                                Start Building
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                    <path d="M7.5 15L12.5 10L7.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </a>
+                            <a href="#demo" class="btn btn-outline btn-large">
+                                View Demo
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                    <path d="M10 18C14.4183 18 18 14.4183 18 10C18 5.58172 14.4183 2 10 2C5.58172 2 2 5.58172 2 10C2 14.4183 5.58172 18 10 18Z" stroke="currentColor" stroke-width="2"/>
+                                    <path d="M8 7L13 10L8 13V7Z" fill="currentColor"/>
+                                </svg>
+                            </a>
+                        </div>
+                        <div class="hero-stats">
+                            <div class="stat">
+                                <div class="stat-number">99.9%</div>
+                                <div class="stat-label">Uptime SLA</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-number">&lt;1ms</div>
+                                <div class="stat-label">Response Time</div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-number">1000+</div>
+                                <div class="stat-label">Organizations</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="hero-visual">
+                        <div class="architecture-diagram">
+                            <div class="diagram-container">
+                                <div class="component kubernetes">
+                                    <div class="component-icon">☸️</div>
+                                    <div class="component-label">Kubernetes</div>
+                                </div>
+                                <div class="component operator">
+                                    <div class="component-icon">🔧</div>
+                                    <div class="component-label">OpenFGA Operator</div>
+                                </div>
+                                <div class="component security">
+                                    <div class="component-icon">🛡️</div>
+                                    <div class="component-label">Security Engine</div>
+                                </div>
+                                <div class="component authz">
+                                    <div class="component-icon">🔐</div>
+                                    <div class="component-label">Authorization</div>
+                                </div>
+                                <!-- Connection lines -->
+                                <svg class="connections" viewBox="0 0 300 200">
+                                    <defs>
+                                        <linearGradient id="connectionGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                                            <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+                                            <stop offset="100%" style="stop-color:#8b5cf6;stop-opacity:1" />
+                                        </linearGradient>
+                                    </defs>
+                                    <path d="M75 50 L225 50" stroke="url(#connectionGradient)" stroke-width="2" stroke-dasharray="5,5">
+                                        <animate attributeName="stroke-dashoffset" values="0;10" dur="1s" repeatCount="indefinite"/>
+                                    </path>
+                                    <path d="M75 100 L225 100" stroke="url(#connectionGradient)" stroke-width="2" stroke-dasharray="5,5">
+                                        <animate attributeName="stroke-dashoffset" values="0;10" dur="1s" repeatCount="indefinite"/>
+                                    </path>
+                                    <path d="M150 25 L150 175" stroke="url(#connectionGradient)" stroke-width="2" stroke-dasharray="5,5">
+                                        <animate attributeName="stroke-dashoffset" values="0;10" dur="1s" repeatCount="indefinite"/>
+                                    </path>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="hero-background">
+                <div class="gradient-orb orb-1"></div>
+                <div class="gradient-orb orb-2"></div>
+                <div class="gradient-orb orb-3"></div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="features" class="features">
+            <div class="container">
+                <div class="section-header">
+                    <h2 class="section-title">Enterprise-Ready Features</h2>
+                    <p class="section-subtitle">
+                        AuthCore provides everything you need for production-grade authorization infrastructure
+                    </p>
+                </div>
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <div class="feature-icon">🛡️</div>
+                        <h3 class="feature-title">Advanced Security</h3>
+                        <p class="feature-description">
+                            Multi-layered security with admission controllers, image verification, 
+                            and AI-powered threat detection.
+                        </p>
+                        <ul class="feature-list">
+                            <li>Admission Controller Validation</li>
+                            <li>GPG Signature Verification</li>
+                            <li>Malicious Code Analysis</li>
+                            <li>Behavioral Anomaly Detection</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">⚡</div>
+                        <h3 class="feature-title">High Performance</h3>
+                        <p class="feature-description">
+                            Optimized for low latency and high throughput with intelligent 
+                            caching and resource management.
+                        </p>
+                        <ul class="feature-list">
+                            <li>Sub-millisecond Response Times</li>
+                            <li>Horizontal Auto-scaling</li>
+                            <li>Intelligent Caching</li>
+                            <li>Resource Optimization</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🔧</div>
+                        <h3 class="feature-title">Developer Experience</h3>
+                        <p class="feature-description">
+                            Intuitive APIs, comprehensive documentation, and powerful 
+                            debugging tools for rapid development.
+                        </p>
+                        <ul class="feature-list">
+                            <li>Declarative Configuration</li>
+                            <li>Rich API Documentation</li>
+                            <li>Interactive Playground</li>
+                            <li>Comprehensive Debugging</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">📊</div>
+                        <h3 class="feature-title">Observability</h3>
+                        <p class="feature-description">
+                            Complete visibility into your authorization systems with 
+                            metrics, logging, and distributed tracing.
+                        </p>
+                        <ul class="feature-list">
+                            <li>Prometheus Metrics</li>
+                            <li>Structured Logging</li>
+                            <li>Distributed Tracing</li>
+                            <li>Real-time Alerting</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🏢</div>
+                        <h3 class="feature-title">Enterprise Ready</h3>
+                        <p class="feature-description">
+                            Built for large-scale deployments with multi-tenancy, 
+                            compliance, and enterprise integrations.
+                        </p>
+                        <ul class="feature-list">
+                            <li>Multi-cluster Management</li>
+                            <li>Enterprise SSO Integration</li>
+                            <li>Compliance Automation</li>
+                            <li>SLA Management</li>
+                        </ul>
+                    </div>
+                    <div class="feature-card">
+                        <div class="feature-icon">🌐</div>
+                        <h3 class="feature-title">Open Source</h3>
+                        <p class="feature-description">
+                            Apache 2.0 licensed with transparent development and 
+                            active community participation.
+                        </p>
+                        <ul class="feature-list">
+                            <li>No Vendor Lock-in</li>
+                            <li>Community Driven</li>
+                            <li>Transparent Development</li>
+                            <li>Extensive Ecosystem</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Security Section -->
+        <section id="security" class="security">
+            <div class="container">
+                <div class="security-content">
+                    <div class="security-text">
+                        <h2 class="section-title">Security by Design</h2>
+                        <p class="section-subtitle">
+                            AuthCore implements a comprehensive security framework that protects 
+                            against modern threats and ensures compliance with industry standards.
+                        </p>
+                        <div class="security-features">
+                            <div class="security-feature">
+                                <div class="security-feature-icon">🔐</div>
+                                <div class="security-feature-content">
+                                    <h4>Zero Trust Architecture</h4>
+                                    <p>No implicit trust, continuous verification of all components and interactions.</p>
+                                </div>
+                            </div>
+                            <div class="security-feature">
+                                <div class="security-feature-icon">🎯</div>
+                                <div class="security-feature-content">
+                                    <h4>Threat Intelligence</h4>
+                                    <p>AI-powered threat detection with integration to external threat intelligence feeds.</p>
+                                </div>
+                            </div>
+                            <div class="security-feature">
+                                <div class="security-feature-icon">📋</div>
+                                <div class="security-feature-content">
+                                    <h4>Compliance Ready</h4>
+                                    <p>Built-in compliance with SOC 2, ISO 27001, NIST, and other frameworks.</p>
+                                </div>
+                            </div>
+                        </div>
+                        <a href="docs/security/" class="btn btn-primary">Learn More About Security</a>
+                    </div>
+                    <div class="security-visual">
+                        <div class="security-diagram">
+                            <div class="security-layer layer-1">
+                                <span>Network Security</span>
+                            </div>
+                            <div class="security-layer layer-2">
+                                <span>Application Security</span>
+                            </div>
+                            <div class="security-layer layer-3">
+                                <span>Data Security</span>
+                            </div>
+                            <div class="security-center">
+                                <span>AuthCore</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- CTA Section -->
+        <section id="get-started" class="cta">
+            <div class="container">
+                <div class="cta-content">
+                    <h2 class="cta-title">Ready to Transform Your Authorization?</h2>
+                    <p class="cta-subtitle">
+                        Join thousands of organizations already using AuthCore to secure their applications
+                    </p>
+                    <div class="cta-actions">
+                        <a href="https://github.com/jralmaraz/Openfga-operator" class="btn btn-primary btn-large">
+                            Get Started Free
+                        </a>
+                        <a href="#contact" class="btn btn-outline btn-large">
+                            Contact Sales
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <div class="footer-brand">
+                        <img src="assets/authcore-logo.svg" alt="AuthCore" class="footer-logo">
+                        <span class="footer-brand-text">AuthCore</span>
+                    </div>
+                    <p class="footer-description">
+                        Next-generation authorization infrastructure powered by OpenFGA Operator.
+                        Secure, scalable, and developer-friendly.
+                    </p>
+                    <div class="footer-social">
+                        <a href="https://github.com/jralmaraz/Openfga-operator" class="social-link">GitHub</a>
+                        <a href="#" class="social-link">Twitter</a>
+                        <a href="#" class="social-link">LinkedIn</a>
+                    </div>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-title">Product</h4>
+                    <ul class="footer-links">
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#security">Security</a></li>
+                        <li><a href="docs/">Documentation</a></li>
+                        <li><a href="docs/roadmap/">Roadmap</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-title">Developers</h4>
+                    <ul class="footer-links">
+                        <li><a href="docs/getting-started/">Getting Started</a></li>
+                        <li><a href="docs/api/">API Reference</a></li>
+                        <li><a href="docs/examples/">Examples</a></li>
+                        <li><a href="https://github.com/jralmaraz/Openfga-operator">GitHub</a></li>
+                    </ul>
+                </div>
+                <div class="footer-section">
+                    <h4 class="footer-title">Company</h4>
+                    <ul class="footer-links">
+                        <li><a href="#about">About</a></li>
+                        <li><a href="#contact">Contact</a></li>
+                        <li><a href="docs/security/">Security</a></li>
+                        <li><a href="privacy.html">Privacy</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <div class="footer-copyright">
+                    © 2024 AuthCore. Licensed under Apache 2.0. All rights reserved.
+                </div>
+                <div class="footer-legal">
+                    <a href="privacy.html">Privacy Policy</a>
+                    <a href="terms.html">Terms of Service</a>
+                    <a href="docs/security/">Security</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
