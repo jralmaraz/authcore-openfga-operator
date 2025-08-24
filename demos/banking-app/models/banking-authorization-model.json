@@ -1,0 +1,449 @@
+{
+  "schema_version": "1.1",
+  "type_definitions": [
+    {
+      "type": "user",
+      "metadata": {
+        "description": "Represents a user in the banking system"
+      }
+    },
+    {
+      "type": "bank",
+      "metadata": {
+        "description": "A bank organization"
+      },
+      "relations": {
+        "admin": {
+          "this": {}
+        },
+        "employee": {
+          "this": {}
+        },
+        "customer": {
+          "this": {}
+        },
+        "viewer": {
+          "union": {
+            "child": [
+              {
+                "this": {}
+              },
+              {
+                "computedUserset": {
+                  "relation": "employee"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "admin"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "admin": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "employee": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "customer": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "viewer": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "branch",
+      "metadata": {
+        "description": "A bank branch"
+      },
+      "relations": {
+        "bank": {
+          "this": {}
+        },
+        "manager": {
+          "this": {}
+        },
+        "teller": {
+          "this": {}
+        },
+        "viewer": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "manager"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "teller"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "bank"
+                  },
+                  "computedUserset": {
+                    "relation": "viewer"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "bank": {
+            "directly_related_user_types": [
+              {
+                "type": "bank"
+              }
+            ]
+          },
+          "manager": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "teller": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "account",
+      "metadata": {
+        "description": "A bank account"
+      },
+      "relations": {
+        "bank": {
+          "this": {}
+        },
+        "branch": {
+          "this": {}
+        },
+        "owner": {
+          "this": {}
+        },
+        "co_owner": {
+          "this": {}
+        },
+        "authorized_user": {
+          "this": {}
+        },
+        "viewer": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "owner"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "co_owner"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "authorized_user"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "branch"
+                  },
+                  "computedUserset": {
+                    "relation": "viewer"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "editor": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "owner"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "co_owner"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "branch"
+                  },
+                  "computedUserset": {
+                    "relation": "manager"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "bank": {
+            "directly_related_user_types": [
+              {
+                "type": "bank"
+              }
+            ]
+          },
+          "branch": {
+            "directly_related_user_types": [
+              {
+                "type": "branch"
+              }
+            ]
+          },
+          "owner": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "co_owner": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "authorized_user": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "transaction",
+      "metadata": {
+        "description": "A bank transaction"
+      },
+      "relations": {
+        "account": {
+          "this": {}
+        },
+        "initiator": {
+          "this": {}
+        },
+        "approver": {
+          "this": {}
+        },
+        "viewer": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "initiator"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "account"
+                  },
+                  "computedUserset": {
+                    "relation": "viewer"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "editor": {
+          "union": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "account"
+                  },
+                  "computedUserset": {
+                    "relation": "editor"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "account": {
+            "directly_related_user_types": [
+              {
+                "type": "account"
+              }
+            ]
+          },
+          "initiator": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "approver": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "loan",
+      "metadata": {
+        "description": "A bank loan"
+      },
+      "relations": {
+        "bank": {
+          "this": {}
+        },
+        "borrower": {
+          "this": {}
+        },
+        "co_borrower": {
+          "this": {}
+        },
+        "loan_officer": {
+          "this": {}
+        },
+        "viewer": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "borrower"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "co_borrower"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "loan_officer"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "bank"
+                  },
+                  "computedUserset": {
+                    "relation": "employee"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "editor": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "loan_officer"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "bank"
+                  },
+                  "computedUserset": {
+                    "relation": "admin"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "bank": {
+            "directly_related_user_types": [
+              {
+                "type": "bank"
+              }
+            ]
+          },
+          "borrower": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "co_borrower": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "loan_officer": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
