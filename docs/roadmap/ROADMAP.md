@@ -69,7 +69,6 @@ To provide the most secure, scalable, and developer-friendly way to deploy and m
 **Status**: 🔬 Research
 
 #### Innovation Focus
-- **Quantum-Ready Security**: Post-quantum cryptography integration
 - **Edge Computing**: Optimized edge deployment capabilities
 - **Service Mesh Native**: Deep integration with Istio and other service meshes
 - **Cloud Provider Integration**: Native integration with major cloud providers
@@ -115,7 +114,6 @@ Security Stack:
 - **AI Security Assistant**: AI-powered security recommendations
 - **Predictive Threat Detection**: Proactive threat identification
 - **Automated Penetration Testing**: Continuous security testing
-- **Quantum-Safe Cryptography**: Future-proof security implementation
 
 ## Product Positioning
 

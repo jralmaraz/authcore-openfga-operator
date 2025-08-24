@@ -337,7 +337,7 @@ These checks run automatically on pull requests and provide status checks.
 
 ### Future Releases 📋
 - **v1.2.0**: Multi-cluster management and edge computing
-- **v2.0.0**: Quantum-ready security and next-generation features
+- **v2.0.0**: Next-generation features
 
 For detailed roadmap information, see [Product Roadmap](docs/roadmap/ROADMAP.md).
 
