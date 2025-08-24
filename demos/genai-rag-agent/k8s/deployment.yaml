@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: genai-rag-agent
+  namespace: default
+  labels:
+    app: genai-rag-agent
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: genai-rag-agent
+  template:
+    metadata:
+      labels:
+        app: genai-rag-agent
+    spec:
+      containers:
+      - name: genai-rag-agent
+        image: genai-rag-agent:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: HOST
+          value: "0.0.0.0"
+        - name: PORT
+          value: "8000"
+        - name: ENVIRONMENT
+          value: "production"
+        - name: OPENFGA_API_URL
+          value: "http://openfga-basic:8080"
+        - name: OPENFGA_STORE_ID
+          valueFrom:
+            secretKeyRef:
+              name: genai-demo-config
+              key: store-id
+        - name: OPENFGA_AUTH_MODEL_ID
+          valueFrom:
+            secretKeyRef:
+              name: genai-demo-config
+              key: auth-model-id
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: genai-demo-config
+              key: openai-api-key
+              optional: true
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: genai-rag-agent-service
+  namespace: default
+  labels:
+    app: genai-rag-agent
+spec:
+  selector:
+    app: genai-rag-agent
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: genai-demo-config
+  namespace: default
+type: Opaque
+stringData:
+  store-id: ""  # Will be populated after setup
+  auth-model-id: ""  # Will be populated after setup
+  openai-api-key: ""  # Optional: Add your OpenAI API key

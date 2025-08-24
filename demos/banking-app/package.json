@@ -1,0 +1,53 @@
+{
+  "name": "openfga-banking-demo",
+  "version": "1.0.0",
+  "description": "Demo banking application showcasing OpenFGA authorization",
+  "main": "dist/app.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/app.js",
+    "dev": "ts-node src/app.ts",
+    "setup": "npm run build && node dist/setup.js",
+    "test": "jest",
+    "lint": "eslint src/**/*.ts",
+    "lint:fix": "eslint src/**/*.ts --fix"
+  },
+  "keywords": [
+    "openfga",
+    "authorization",
+    "banking",
+    "demo",
+    "kubernetes"
+  ],
+  "author": "OpenFGA Team",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@openfga/sdk": "^0.3.5",
+    "express": "^4.18.2",
+    "helmet": "^7.0.0",
+    "cors": "^2.8.5",
+    "morgan": "^1.10.0",
+    "uuid": "^9.0.0",
+    "dotenv": "^16.3.1",
+    "joi": "^17.9.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.17",
+    "@types/cors": "^2.8.13",
+    "@types/morgan": "^1.9.4",
+    "@types/uuid": "^9.0.2",
+    "@types/node": "^20.4.5",
+    "@types/jest": "^29.5.3",
+    "typescript": "^5.1.6",
+    "ts-node": "^10.9.1",
+    "jest": "^29.6.1",
+    "ts-jest": "^29.1.1",
+    "@typescript-eslint/eslint-plugin": "^6.2.0",
+    "@typescript-eslint/parser": "^6.2.0",
+    "eslint": "^8.45.0"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
