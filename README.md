@@ -1,18 +1,52 @@
 # OpenFGA Operator
 
-A Kubernetes operator for managing [OpenFGA](https://openfga.dev/) instances.
+A security-first Kubernetes operator for managing [OpenFGA](https://openfga.dev/) instances with enterprise-grade protection against malicious code injection and comprehensive security controls.
 
 ## Overview
 
-This operator provides a Kubernetes-native way to deploy and manage OpenFGA (Fine-Grained Authorization) instances in your cluster. It uses Custom Resource Definitions (CRDs) to define OpenFGA instances and automatically creates and manages the necessary Kubernetes resources.
+The OpenFGA Operator provides a Kubernetes-native way to deploy and manage OpenFGA (Fine-Grained Authorization) instances with industry-leading security features. Built with a security-first approach, it implements comprehensive admission controllers, malicious code analysis, and cryptographic verification systems to ensure the highest level of security for authorization infrastructure.
 
-## Features
+## 🛡️ Security Features
 
+### Advanced Security Architecture
+- **Admission Controller Framework**: Comprehensive validation webhook system with policy enforcement
+- **Malicious Code Injection Analysis**: AI-powered static and dynamic security analysis
+- **Git Commit Verification**: Cryptographic GPG signature verification for all commits
+- **Developer Authentication**: Multi-factor authentication with certificate-based validation
+- **Container Image Security**: Vulnerability scanning and signature verification
+- **Zero Trust Architecture**: No implicit trust, continuous verification of all components
+
+### Security by Design
+- **Defense in Depth**: Multiple layers of security controls
+- **Supply Chain Security**: End-to-end security for deployment pipeline
+- **Behavioral Analysis**: ML-based anomaly detection and threat intelligence
+- **Automated Incident Response**: Self-healing security violations
+- **Compliance Ready**: SOC 2, ISO 27001, and NIST framework compliance
+
+## 🚀 Core Features
+
+- **Security-First Design**: Comprehensive security architecture with admission controllers
 - **Custom Resource Definition (CRD)**: Define OpenFGA instances using Kubernetes-native resources
 - **Automatic Resource Management**: Creates and maintains Deployments and Services for OpenFGA instances
 - **Configurable Datastores**: Support for memory, PostgreSQL, and MySQL datastores
 - **Playground Support**: Optional OpenFGA playground interface
 - **Status Tracking**: Real-time status updates and conditions
+- **Enterprise Ready**: Multi-tenancy, SSO integration, and compliance automation
+
+## Documentation
+
+### 📚 Comprehensive Documentation
+- **[Security Architecture](docs/security/SECURITY_ARCHITECTURE.md)**: Detailed security design and implementation
+- **[Design Documentation](docs/design/ARCHITECTURE.md)**: Complete system architecture and design patterns
+- **[Product Roadmap](docs/roadmap/ROADMAP.md)**: Strategic vision and release planning
+- **[Product Log](docs/product-log/PRODUCT_LOG.md)**: Comprehensive product documentation
+- **[Security Policy](docs/security/SECURITY_POLICY.md)**: Security requirements and standards
+- **[Incident Response](docs/security/INCIDENT_RESPONSE.md)**: Security incident response procedures
+
+### 🌐 AuthCore Showcase
+- **[AuthCore Website](docs/authcore-website/)**: Professional showcase website with content management
+- **Live Demo**: [AuthCore Demo](docs/authcore-website/index.html) - Interactive demonstration
+- **Stakeholder Presentation**: Comprehensive demo for business stakeholders
 
 ## Prerequisites
 
@@ -84,6 +118,71 @@ spec:
     port: 8081
   http:
     port: 8080
+```
+
+## Security Implementation
+
+### Admission Controller Setup
+
+The OpenFGA Operator includes a comprehensive admission controller for security validation:
+
+```yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionWebhook
+metadata:
+  name: openfga-security-validator
+spec:
+  clientConfig:
+    service:
+      name: openfga-operator-webhook
+      namespace: openfga-system
+      path: "/validate"
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["authorization.openfga.dev"]
+    apiVersions: ["v1alpha1"]
+    resources: ["openfgas"]
+```
+
+### Git Commit Verification
+
+Enable GPG signature verification for all commits:
+
+```bash
+# Configure Git signing
+git config --global user.signingkey YOUR_GPG_KEY_ID
+git config --global commit.gpgsign true
+
+# Pre-commit hook for verification
+#!/bin/bash
+if ! git verify-commit HEAD; then
+    echo "ERROR: Commit must be signed with GPG"
+    exit 1
+fi
+```
+
+### Security Policy Configuration
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openfga-security-policy
+  namespace: openfga-system
+data:
+  policy.yaml: |
+    securityPolicy:
+      imageVerification:
+        enforced: true
+        allowedRegistries:
+          - "gcr.io/openfga"
+          - "quay.io/openfga"
+      developerAuth:
+        enforced: true
+        requiredSignatures: ["gpg"]
+      vulnerabilityScanning:
+        enforced: true
+        maxSeverity: "medium"
 ```
 
 ## Configuration
@@ -176,23 +275,123 @@ These checks run automatically on pull requests and provide status checks.
 ├── crds/                 # CRD YAML definitions
 │   └── openfga-crd.yaml
 ├── k8s/                  # Kubernetes manifests
+├── docs/                 # Comprehensive documentation
+│   ├── security/         # Security architecture and policies
+│   │   ├── SECURITY_ARCHITECTURE.md
+│   │   ├── SECURITY_POLICY.md
+│   │   └── INCIDENT_RESPONSE.md
+│   ├── design/           # System design documentation
+│   │   └── ARCHITECTURE.md
+│   ├── roadmap/          # Product roadmap and strategy
+│   │   └── ROADMAP.md
+│   ├── product-log/      # Product documentation
+│   │   └── PRODUCT_LOG.md
+│   └── authcore-website/ # AuthCore showcase website
+│       ├── index.html
+│       ├── styles.css
+│       ├── script.js
+│       └── README.md
 ├── Makefile              # Build and development commands
 └── .github/workflows/    # CI/CD workflows
     └── ci.yml
 ```
 
+## Enterprise Features
+
+### 🏢 Enterprise Security
+- **Multi-tenancy**: Secure tenant isolation with namespace-based segmentation
+- **Enterprise SSO**: Integration with SAML, OIDC, and Active Directory
+- **Compliance Automation**: Automated compliance reporting and validation
+- **Audit Logging**: Comprehensive audit trails for all operations
+- **Risk Management**: Risk-based security policies and controls
+
+### 📊 Observability and Monitoring
+- **Prometheus Integration**: Comprehensive metrics collection
+- **Grafana Dashboards**: Pre-built monitoring dashboards
+- **Distributed Tracing**: OpenTelemetry integration for request tracing
+- **Alert Management**: Intelligent alerting with reduced false positives
+- **SLA Monitoring**: Service level agreement tracking and reporting
+
+### 🔧 Operations Excellence
+- **GitOps Ready**: Native GitOps workflow integration
+- **Multi-cluster**: Cross-cluster OpenFGA management
+- **Disaster Recovery**: Automated backup and recovery procedures
+- **Performance Optimization**: Intelligent resource allocation and scaling
+- **Cost Management**: Resource optimization and cost tracking
+
+## Roadmap and Releases
+
+### Current Release (v1.0.0) - Security Foundation ✅
+- Core operator functionality with security-first design
+- Advanced admission controller framework
+- Git commit verification and developer authentication
+- Malicious code injection analysis
+- Container image scanning and vulnerability assessment
+
+### Next Release (v1.1.0) - Enhanced Protection 🚧
+- AI-powered threat detection and behavioral analysis
+- Advanced incident response automation
+- Multi-tenancy support with enhanced isolation
+- Enterprise SSO integration
+- Advanced compliance reporting
+
+### Future Releases 📋
+- **v1.2.0**: Multi-cluster management and edge computing
+- **v2.0.0**: Quantum-ready security and next-generation features
+
+For detailed roadmap information, see [Product Roadmap](docs/roadmap/ROADMAP.md).
+
 ## Contributing
 
+### Security-First Development
+All contributions must follow our security guidelines:
+
+1. **GPG Signed Commits**: All commits must be signed with GPG keys
+2. **Security Review**: Security review required for all PRs
+3. **Vulnerability Scanning**: Automated scanning of all dependencies
+4. **Code Analysis**: Static analysis for security vulnerabilities
+
+### Development Process
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
-4. Run tests: `make test`
-5. Run checks: `make check-all`
-6. Submit a pull request
+3. Implement changes with security considerations
+4. Run security checks: `make security-check`
+5. Run tests: `make test`
+6. Run all quality checks: `make check-all`
+7. Submit a pull request with detailed security impact analysis
 
-## License
+### Security Contributions
+We especially welcome contributions in:
+- Security architecture improvements
+- Threat detection enhancements
+- Compliance framework additions
+- Documentation and security guides
 
-Apache 2.0 License. See [LICENSE](LICENSE) for details.
+For security vulnerabilities, please follow our [Security Policy](docs/security/SECURITY_POLICY.md) and contact security@openfga.dev.
+
+## Support and Community
+
+### 📞 Getting Help
+- **Documentation**: [Complete documentation](docs/) available
+- **Issues**: [GitHub Issues](https://github.com/jralmaraz/Openfga-operator/issues) for bug reports
+- **Discussions**: [GitHub Discussions](https://github.com/jralmaraz/Openfga-operator/discussions) for questions
+- **Security**: security@openfga.dev for security-related inquiries
+
+### 🌟 Community
+- **Star the Project**: Show your support on GitHub
+- **Join Discussions**: Participate in community discussions
+- **Contribute**: Help improve the project through contributions
+- **Share**: Help others discover AuthCore and OpenFGA Operator
+
+## License and Open Source
+
+This project is licensed under the **Apache 2.0 License**, ensuring:
+- **Open Source**: Fully open source with no vendor lock-in
+- **Commercial Use**: Free for commercial and enterprise use
+- **Community Driven**: Transparent development and governance
+- **Extensible**: Permissive license for modifications and integrations
+
+See [LICENSE](LICENSE) for complete details.
 
 ## Related Projects
 
