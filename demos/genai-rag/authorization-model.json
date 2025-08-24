@@ -1,0 +1,567 @@
+{
+  "schema_version": "1.1",
+  "type_definitions": [
+    {
+      "type": "organization",
+      "relations": {
+        "admin": {
+          "this": {}
+        },
+        "member": {
+          "this": {}
+        }
+      },
+      "metadata": {
+        "relations": {
+          "admin": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "member": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "knowledge_base",
+      "relations": {
+        "parent_org": {
+          "this": {}
+        },
+        "curator": {
+          "this": {}
+        },
+        "contributor": {
+          "this": {}
+        },
+        "reader": {
+          "this": {}
+        },
+        "can_view": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "curator"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "contributor"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "reader"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "parent_org"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "can_contribute": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "curator"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "contributor"
+                }
+              }
+            ]
+          }
+        },
+        "can_curate": {
+          "computedUserset": {
+            "relation": "curator"
+          }
+        },
+        "can_admin": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "curator"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "parent_org"
+                  },
+                  "computedUserset": {
+                    "relation": "admin"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "parent_org": {
+            "directly_related_user_types": [
+              {
+                "type": "organization"
+              }
+            ]
+          },
+          "curator": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "contributor": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "reader": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "document",
+      "relations": {
+        "parent_kb": {
+          "this": {}
+        },
+        "owner": {
+          "this": {}
+        },
+        "editor": {
+          "this": {}
+        },
+        "viewer": {
+          "this": {}
+        },
+        "can_view": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "owner"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "editor"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "viewer"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "parent_kb"
+                  },
+                  "computedUserset": {
+                    "relation": "can_view"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "can_edit": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "owner"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "editor"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "parent_kb"
+                  },
+                  "computedUserset": {
+                    "relation": "can_contribute"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "can_delete": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "owner"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "parent_kb"
+                  },
+                  "computedUserset": {
+                    "relation": "can_curate"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "can_use_in_rag": {
+          "computedUserset": {
+            "relation": "can_view"
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "parent_kb": {
+            "directly_related_user_types": [
+              {
+                "type": "knowledge_base"
+              }
+            ]
+          },
+          "owner": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "editor": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "viewer": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "ai_model",
+      "relations": {
+        "parent_org": {
+          "this": {}
+        },
+        "operator": {
+          "this": {}
+        },
+        "user": {
+          "this": {}
+        },
+        "can_use": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "operator"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "user"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "parent_org"
+                  },
+                  "computedUserset": {
+                    "relation": "member"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "can_configure": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "operator"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "parent_org"
+                  },
+                  "computedUserset": {
+                    "relation": "admin"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "can_admin": {
+          "computedUserset": {
+            "relation": "operator"
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "parent_org": {
+            "directly_related_user_types": [
+              {
+                "type": "organization"
+              }
+            ]
+          },
+          "operator": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "user": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "rag_session",
+      "relations": {
+        "parent_kb": {
+          "this": {}
+        },
+        "parent_model": {
+          "this": {}
+        },
+        "owner": {
+          "this": {}
+        },
+        "participant": {
+          "this": {}
+        },
+        "can_view": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "owner"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "participant"
+                }
+              }
+            ]
+          }
+        },
+        "can_query": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "owner"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "participant"
+                }
+              }
+            ]
+          }
+        },
+        "can_access_documents": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "can_query"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "parent_kb"
+                  },
+                  "computedUserset": {
+                    "relation": "can_view"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "can_admin": {
+          "computedUserset": {
+            "relation": "owner"
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "parent_kb": {
+            "directly_related_user_types": [
+              {
+                "type": "knowledge_base"
+              }
+            ]
+          },
+          "parent_model": {
+            "directly_related_user_types": [
+              {
+                "type": "ai_model"
+              }
+            ]
+          },
+          "owner": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "participant": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "rag_query",
+      "relations": {
+        "parent_session": {
+          "this": {}
+        },
+        "queried_documents": {
+          "this": {}
+        },
+        "initiated_by": {
+          "this": {}
+        },
+        "can_view": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "initiated_by"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "parent_session"
+                  },
+                  "computedUserset": {
+                    "relation": "can_view"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "can_access_results": {
+          "intersection": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "can_view"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "queried_documents"
+                  },
+                  "computedUserset": {
+                    "relation": "can_use_in_rag"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "parent_session": {
+            "directly_related_user_types": [
+              {
+                "type": "rag_session"
+              }
+            ]
+          },
+          "queried_documents": {
+            "directly_related_user_types": [
+              {
+                "type": "document"
+              }
+            ]
+          },
+          "initiated_by": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

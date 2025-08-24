@@ -1,0 +1,456 @@
+{
+  "schema_version": "1.1",
+  "type_definitions": [
+    {
+      "type": "bank",
+      "relations": {
+        "admin": {
+          "this": {}
+        },
+        "manager": {
+          "this": {}
+        },
+        "employee": {
+          "union": {
+            "child": [
+              {
+                "this": {}
+              },
+              {
+                "computedUserset": {
+                  "relation": "manager"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "admin": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "manager": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "employee": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "branch",
+      "relations": {
+        "parent_bank": {
+          "this": {}
+        },
+        "manager": {
+          "this": {}
+        },
+        "teller": {
+          "this": {}
+        },
+        "employee": {
+          "union": {
+            "child": [
+              {
+                "this": {}
+              },
+              {
+                "computedUserset": {
+                  "relation": "manager"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "teller"
+                }
+              }
+            ]
+          }
+        },
+        "admin": {
+          "tupleToUserset": {
+            "tupleset": {
+              "relation": "parent_bank"
+            },
+            "computedUserset": {
+              "relation": "admin"
+            }
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "parent_bank": {
+            "directly_related_user_types": [
+              {
+                "type": "bank"
+              }
+            ]
+          },
+          "manager": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "teller": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "employee": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "account",
+      "relations": {
+        "parent_branch": {
+          "this": {}
+        },
+        "owner": {
+          "this": {}
+        },
+        "co_owner": {
+          "this": {}
+        },
+        "authorized_user": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "owner"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "co_owner"
+                }
+              }
+            ]
+          }
+        },
+        "can_view": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "authorized_user"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "parent_branch"
+                  },
+                  "computedUserset": {
+                    "relation": "employee"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "can_deposit": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "authorized_user"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "parent_branch"
+                  },
+                  "computedUserset": {
+                    "relation": "teller"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "can_withdraw": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "authorized_user"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "parent_branch"
+                  },
+                  "computedUserset": {
+                    "relation": "manager"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "can_transfer": {
+          "computedUserset": {
+            "relation": "authorized_user"
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "parent_branch": {
+            "directly_related_user_types": [
+              {
+                "type": "branch"
+              }
+            ]
+          },
+          "owner": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "co_owner": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "loan",
+      "relations": {
+        "parent_branch": {
+          "this": {}
+        },
+        "borrower": {
+          "this": {}
+        },
+        "co_borrower": {
+          "this": {}
+        },
+        "loan_officer": {
+          "this": {}
+        },
+        "can_view": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "borrower"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "co_borrower"
+                }
+              },
+              {
+                "computedUserset": {
+                  "relation": "loan_officer"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "parent_branch"
+                  },
+                  "computedUserset": {
+                    "relation": "manager"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "can_approve": {
+          "union": {
+            "child": [
+              {
+                "computedUserset": {
+                  "relation": "loan_officer"
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "parent_branch"
+                  },
+                  "computedUserset": {
+                    "relation": "manager"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "can_modify": {
+          "computedUserset": {
+            "relation": "loan_officer"
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "parent_branch": {
+            "directly_related_user_types": [
+              {
+                "type": "branch"
+              }
+            ]
+          },
+          "borrower": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "co_borrower": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          },
+          "loan_officer": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "transaction",
+      "relations": {
+        "source_account": {
+          "this": {}
+        },
+        "target_account": {
+          "this": {}
+        },
+        "initiated_by": {
+          "this": {}
+        },
+        "can_view": {
+          "union": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "source_account"
+                  },
+                  "computedUserset": {
+                    "relation": "can_view"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "target_account"
+                  },
+                  "computedUserset": {
+                    "relation": "can_view"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "can_reverse": {
+          "union": {
+            "child": [
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "source_account"
+                  },
+                  "computedUserset": {
+                    "object": {
+                      "relation": "parent_branch"
+                    },
+                    "relation": "manager"
+                  }
+                }
+              },
+              {
+                "tupleToUserset": {
+                  "tupleset": {
+                    "relation": "target_account"
+                  },
+                  "computedUserset": {
+                    "object": {
+                      "relation": "parent_branch"
+                    },
+                    "relation": "manager"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "metadata": {
+        "relations": {
+          "source_account": {
+            "directly_related_user_types": [
+              {
+                "type": "account"
+              }
+            ]
+          },
+          "target_account": {
+            "directly_related_user_types": [
+              {
+                "type": "account"
+              }
+            ]
+          },
+          "initiated_by": {
+            "directly_related_user_types": [
+              {
+                "type": "user"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}
