@@ -1,0 +1,11 @@
+apiVersion: openfga.io/v1alpha1
+kind: OpenFga
+metadata:
+  name: basic-openfga
+  namespace: default
+spec:
+  server:
+    image: "openfga/openfga:latest"
+    replicas: 1
+  storage:
+    type: "memory"

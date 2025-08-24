@@ -1,0 +1,34 @@
+apiVersion: openfga.io/v1alpha1
+kind: OpenFga
+metadata:
+  name: production-openfga
+  namespace: openfga-system
+spec:
+  server:
+    image: "openfga/openfga:v1.3.0"
+    imagePullPolicy: "IfNotPresent"
+    replicas: 3
+    config:
+      log-level: "info"
+      http-addr: "0.0.0.0:8080"
+      grpc-addr: "0.0.0.0:8081"
+  
+  storage:
+    type: "postgres"
+    connection: "postgres://openfga:password@postgres:5432/openfga"
+    config:
+      max-connections: "100"
+  
+  observability:
+    metrics: true
+    tracing: true
+    opentelemetry:
+      endpoint: "http://jaeger:14268/api/traces"
+      headers:
+        "Authorization": "Bearer token123"
+  
+  resources:
+    cpuRequest: "100m"
+    memoryRequest: "128Mi"
+    cpuLimit: "500m"
+    memoryLimit: "512Mi"
