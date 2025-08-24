@@ -1,0 +1,119 @@
+apiVersion: openfga.io/v1alpha1
+kind: OpenFGAStore
+metadata:
+  labels:
+    app.kubernetes.io/name: openfgastore
+    app.kubernetes.io/instance: openfgastore-sample
+    app.kubernetes.io/part-of: openfga-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: openfga-operator
+  name: openfgastore-sample
+  namespace: default
+spec:
+  serverRef:
+    name: openfgaserver-sample
+    namespace: default
+  
+  displayName: "Sample OpenFGA Store"
+  description: "A sample OpenFGA store for demonstration purposes"
+  
+  retentionPolicy:
+    enabled: true
+    tupleRetentionDays: 90
+    modelRetentionDays: 365
+    logRetentionDays: 30
+    autoCleanup: true
+  
+  accessControl:
+    enabled: true
+    allowedServiceAccounts:
+      - "application-service-account"
+      - "api-gateway-service-account"
+    allowedUsers:
+      - "admin@example.com"
+      - "developer@example.com"
+    allowedGroups:
+      - "openfga-admins"
+      - "application-developers"
+    
+    rbacRules:
+      - subjects:
+          - kind: User
+            name: "admin@example.com"
+          - kind: Group
+            name: "openfga-admins"
+        permissions:
+          - "read"
+          - "write"
+          - "admin"
+        resources:
+          - "tuples"
+          - "models"
+          - "stores"
+      - subjects:
+          - kind: ServiceAccount
+            name: "application-service-account"
+            namespace: "default"
+        permissions:
+          - "read"
+          - "write"
+        resources:
+          - "tuples"
+        conditions:
+          environment: "production"
+  
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retentionCount: 7
+    storageClass: "fast-ssd"
+    storageSize: "10Gi"
+    compression: true
+    encryption:
+      enabled: true
+      algorithm: "AES256"
+      keySecret:
+        name: "backup-encryption-key"
+        key: "encryption-key"
+  
+  metrics:
+    enabled: true
+    interval: "30s"
+    customMetrics:
+      - name: "store_tuple_operations_total"
+        type: "counter"
+        description: "Total number of tuple operations"
+        labels:
+          operation: "write"
+      - name: "store_authorization_requests_total"
+        type: "counter"
+        description: "Total number of authorization requests"
+      - name: "store_model_evaluations_duration"
+        type: "histogram"
+        description: "Duration of model evaluations"
+    
+    prometheusConfig:
+      serviceMonitor: true
+      serviceMonitorNamespace: "monitoring"
+      serviceMonitorLabels:
+        release: "prometheus-operator"
+      additionalLabels:
+        team: "platform"
+        component: "authorization"
+  
+  openTelemetry:
+    enabled: true
+    serviceName: "openfga-store"
+    endpoint: "http://otel-collector:4317"
+    samplingRate: 0.1
+    headers:
+      x-service-version: "v1.0.0"
+  
+  labels:
+    environment: "production"
+    team: "platform"
+    component: "authorization"
+  
+  annotations:
+    description: "Main authorization store for the application"
+    contact: "platform-team@example.com"

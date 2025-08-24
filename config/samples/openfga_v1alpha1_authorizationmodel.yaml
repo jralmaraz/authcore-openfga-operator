@@ -1,0 +1,192 @@
+apiVersion: openfga.io/v1alpha1
+kind: AuthorizationModel
+metadata:
+  labels:
+    app.kubernetes.io/name: authorizationmodel
+    app.kubernetes.io/instance: authorizationmodel-sample
+    app.kubernetes.io/part-of: openfga-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: openfga-operator
+  name: authorizationmodel-sample
+  namespace: default
+spec:
+  storeRef:
+    name: openfgastore-sample
+    namespace: default
+    serverRef:
+      name: openfgaserver-sample
+      namespace: default
+  
+  schemaVersion: "1.1"
+  
+  schema:
+    type_definitions:
+      - type: "user"
+        relations: {}
+      
+      - type: "organization"
+        relations:
+          member:
+            this: {}
+          admin:
+            this: {}
+          owner:
+            this: {}
+      
+      - type: "team"
+        relations:
+          member:
+            this: {}
+          admin:
+            this: {}
+          parent:
+            this: {}
+      
+      - type: "repository"
+        relations:
+          owner:
+            this: {}
+          admin:
+            this: {}
+          maintainer:
+            this: {}
+          reader:
+            union:
+              children:
+                - this: {}
+                - computedUserset:
+                    object: ""
+                    relation: "maintainer"
+                - computedUserset:
+                    object: ""
+                    relation: "admin"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          writer:
+            union:
+              children:
+                - this: {}
+                - computedUserset:
+                    object: ""
+                    relation: "maintainer"
+                - computedUserset:
+                    object: ""
+                    relation: "admin"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          org_member:
+            tupleToUserset:
+              tupleSet:
+                relation: "parent"
+              computedUserset:
+                object: ""
+                relation: "member"
+          team_member:
+            tupleToUserset:
+              tupleSet:
+                relation: "team"
+              computedUserset:
+                object: ""
+                relation: "member"
+      
+      - type: "document"
+        relations:
+          owner:
+            this: {}
+          editor:
+            this: {}
+          viewer:
+            union:
+              children:
+                - this: {}
+                - computedUserset:
+                    object: ""
+                    relation: "editor"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          can_read:
+            computedUserset:
+              object: ""
+              relation: "viewer"
+          can_write:
+            union:
+              children:
+                - computedUserset:
+                    object: ""
+                    relation: "editor"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          can_delete:
+            computedUserset:
+              object: ""
+              relation: "owner"
+          parent_folder:
+            this: {}
+          inherited_viewer:
+            tupleToUserset:
+              tupleSet:
+                relation: "parent_folder"
+              computedUserset:
+                object: ""
+                relation: "viewer"
+      
+      - type: "folder"
+        relations:
+          owner:
+            this: {}
+          editor:
+            this: {}
+          viewer:
+            union:
+              children:
+                - this: {}
+                - computedUserset:
+                    object: ""
+                    relation: "editor"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          can_read:
+            computedUserset:
+              object: ""
+              relation: "viewer"
+          can_write:
+            union:
+              children:
+                - computedUserset:
+                    object: ""
+                    relation: "editor"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          can_delete:
+            computedUserset:
+              object: ""
+              relation: "owner"
+          can_create_child:
+            union:
+              children:
+                - computedUserset:
+                    object: ""
+                    relation: "editor"
+                - computedUserset:
+                    object: ""
+                    relation: "owner"
+          parent_folder:
+            this: {}
+  
+  conditions:
+    ip_address_restriction: "source_ip in allowed_ip_ranges"
+    time_based_access: "current_time within business_hours"
+  
+  openTelemetry:
+    enabled: true
+    serviceName: "authorization-model"
+    endpoint: "http://otel-collector:4317"
+    samplingRate: 0.2
+    headers:
+      x-model-version: "v1.0.0"

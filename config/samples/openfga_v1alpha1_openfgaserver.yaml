@@ -1,0 +1,114 @@
+apiVersion: openfga.io/v1alpha1
+kind: OpenFGAServer
+metadata:
+  labels:
+    app.kubernetes.io/name: openfgaserver
+    app.kubernetes.io/instance: openfgaserver-sample
+    app.kubernetes.io/part-of: openfga-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: openfga-operator
+  name: openfgaserver-sample
+  namespace: default
+spec:
+  image: openfga/openfga:latest
+  replicas: 2
+  port: 8080
+  grpcPort: 8081
+  
+  database:
+    type: postgres
+    host: postgres-service
+    port: 5432
+    database: openfga
+    username: openfga
+    passwordSecret:
+      name: postgres-credentials
+      key: password
+    sslMode: require
+    maxOpenConns: 30
+    maxIdleConns: 10
+  
+  config:
+    logLevel: info
+    logFormat: json
+    maxTuplesPerWrite: 100
+    maxAuthorizationModelSizeInBytes: 262144
+    playgroundEnabled: false
+    
+    httpConfig:
+      readTimeout: 30s
+      writeTimeout: 30s
+      idleTimeout: 120s
+      readHeaderTimeout: 10s
+      corsAllowedOrigins:
+        - "*"
+      corsAllowedHeaders:
+        - "Content-Type"
+        - "Authorization"
+    
+    grpcConfig:
+      enabled: true
+      tlsConfig:
+        enabled: false
+  
+  openTelemetry:
+    enabled: true
+    serviceName: openfga-server
+    endpoint: http://otel-collector:4317
+    samplingRate: 0.1
+    headers:
+      x-honeycomb-team: "your-api-key"
+  
+  networkPolicy:
+    enabled: true
+    allowedIngress:
+      - from:
+          - namespaceSelector:
+              matchLabels:
+                name: application-namespace
+        ports:
+          - port: 8080
+            protocol: TCP
+          - port: 8081
+            protocol: TCP
+    ciliumLabels:
+      app: openfga-server
+      version: v1
+  
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "100m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m"
+  
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  
+  serviceAccountName: openfga-server
+  
+  nodeSelector:
+    kubernetes.io/arch: amd64
+  
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "openfga"
+      effect: "NoSchedule"
+  
+  affinity:
+    podAntiAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          podAffinityTerm:
+            labelSelector:
+              matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                    - openfgaserver
+            topologyKey: kubernetes.io/hostname

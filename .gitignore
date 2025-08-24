@@ -1,0 +1,98 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+testbin/
+Dockerfile.cross
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Kubernetes Generated files - skip generated files, except for vendored files
+!vendor/**/zz_generated.*
+
+# editor and IDE paraphernalia
+.idea
+*.swp
+*.swo
+*~
+.vscode
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+.tmp/
+.temp/
+
+# Build artifacts
+dist/
+build/
+out/
+
+# Dependency directories
+vendor/
+node_modules/
+
+# Go workspace file
+go.work
+
+# Controller-gen and other tools
+bin/controller-gen
+bin/kustomize
+bin/setup-envtest
+
+# Test coverage files
+cover.out
+coverage.txt
+
+# Local development files
+.env
+.env.local
+*.local
+
+# Helm charts (if added later)
+charts/*/charts/
+charts/*/requirements.lock
+
+# IDE files
+.vscode/
+.idea/
+*.iml
+
+# Log files
+*.log
+logs/
+
+# Docker artifacts
+.dockerignore
+
+# Kubernetes manifests with secrets
+*secret*.yaml
+*Secret*.yaml
+
+# Generated manifests (except samples)
+config/crd/patches/
+config/webhook/
+config/certmanager/
+config/prometheus/
+config/default/manager_auth_proxy_patch.yaml
+
+# Local testing artifacts
+kind-config.yaml
+kubeconfig
+*.kubeconfig

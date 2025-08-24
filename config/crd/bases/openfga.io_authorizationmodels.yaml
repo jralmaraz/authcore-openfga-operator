@@ -1,0 +1,357 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.13.0
+  name: authorizationmodels.openfga.io
+spec:
+  group: openfga.io
+  names:
+    kind: AuthorizationModel
+    listKind: AuthorizationModelList
+    plural: authorizationmodels
+    singular: authorizationmodel
+  scope: Namespaced
+  versions:
+  - additionalPrinterColumns:
+    - jsonPath: .status.phase
+      name: Phase
+      type: string
+    - jsonPath: .status.modelID
+      name: Model ID
+      type: string
+    - jsonPath: .status.storeID
+      name: Store ID
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    - jsonPath: .status.appliedAt
+      name: Applied At
+      type: date
+    name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: AuthorizationModel is the Schema for the authorizationmodels API
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object.'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents.'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: AuthorizationModelSpec defines the desired state of AuthorizationModel
+            properties:
+              conditions:
+                additionalProperties:
+                  type: string
+                description: Conditions defines additional conditions for the authorization model
+                type: object
+              openTelemetry:
+                description: OpenTelemetry configuration for observability
+                properties:
+                  enabled:
+                    default: true
+                    description: Enabled indicates whether OpenTelemetry is enabled
+                    type: boolean
+                  endpoint:
+                    description: Endpoint for the OpenTelemetry collector
+                    type: string
+                  headers:
+                    additionalProperties:
+                      type: string
+                    description: Headers to add to OpenTelemetry exports
+                    type: object
+                  samplingRate:
+                    description: SamplingRate for traces (0.0 to 1.0)
+                    maximum: 1
+                    minimum: 0
+                    type: number
+                  serviceName:
+                    description: ServiceName for OpenTelemetry traces
+                    type: string
+                type: object
+              schema:
+                description: Schema defines the authorization model schema
+                properties:
+                  type_definitions:
+                    description: TypeDefinitions define the types and their relations
+                      in the authorization model
+                    items:
+                      description: TypeDefinition defines a type and its relations
+                        in the authorization model
+                      properties:
+                        metadata:
+                          additionalProperties:
+                            type: string
+                          description: Metadata provides additional information about
+                            the type
+                          type: object
+                        relations:
+                          additionalProperties:
+                            description: Relation defines a relation in a type definition
+                            properties:
+                              computedUserset:
+                                description: ComputedUserset defines a computed userset
+                                  relation
+                                properties:
+                                  object:
+                                    description: Object defines the object in the computed
+                                      userset
+                                    type: string
+                                  relation:
+                                    description: Relation defines the relation in the
+                                      computed userset
+                                    type: string
+                                required:
+                                - relation
+                                type: object
+                              difference:
+                                description: Difference defines a difference between
+                                  relations
+                                properties:
+                                  base:
+                                    description: Base is the base relation
+                                    type: object
+                                  subtract:
+                                    description: Subtract is the relation to subtract
+                                    type: object
+                                required:
+                                - base
+                                - subtract
+                                type: object
+                              intersection:
+                                description: Intersection defines an intersection of
+                                  relations
+                                properties:
+                                  children:
+                                    description: Children are the relations in the
+                                      intersection
+                                    items:
+                                      type: object
+                                    minItems: 2
+                                    type: array
+                                required:
+                                - children
+                                type: object
+                              this:
+                                description: This defines the relation using OpenFGA
+                                  DSL
+                                properties:
+                                  condition:
+                                    description: Condition is an optional condition
+                                      for the relation
+                                    type: string
+                                  relation:
+                                    description: Relation is the relation being referenced
+                                    type: string
+                                  type:
+                                    description: Type is the type being referenced
+                                    type: string
+                                  wildcard:
+                                    description: Wildcard indicates if this is a wildcard
+                                      relation
+                                    type: boolean
+                                type: object
+                              tupleToUserset:
+                                description: TupleToUserset defines a tuple-to-userset
+                                  relation
+                                properties:
+                                  computedUserset:
+                                    description: ComputedUserset defines the computed
+                                      userset
+                                    properties:
+                                      object:
+                                        description: Object defines the object in
+                                          the computed userset
+                                        type: string
+                                      relation:
+                                        description: Relation defines the relation
+                                          in the computed userset
+                                        type: string
+                                    required:
+                                    - relation
+                                    type: object
+                                  tupleSet:
+                                    description: TupleSet defines the tuple set
+                                    properties:
+                                      relation:
+                                        description: Relation is the relation in the
+                                          tuple set
+                                        type: string
+                                    required:
+                                    - relation
+                                    type: object
+                                required:
+                                - computedUserset
+                                - tupleSet
+                                type: object
+                              union:
+                                description: Union defines a union of relations
+                                properties:
+                                  children:
+                                    description: Children are the relations in the
+                                      union
+                                    items:
+                                      type: object
+                                    minItems: 2
+                                    type: array
+                                required:
+                                - children
+                                type: object
+                            type: object
+                          description: Relations define the relations for this type
+                          type: object
+                        type:
+                          description: Type is the name of the type
+                          pattern: ^[a-zA-Z][a-zA-Z0-9_]*$
+                          type: string
+                      required:
+                      - type
+                      type: object
+                    minItems: 1
+                    type: array
+                required:
+                - type_definitions
+                type: object
+              schemaVersion:
+                default: "1.1"
+                description: SchemaVersion specifies the version of the authorization
+                  model schema
+                pattern: ^1\.1$
+                type: string
+              storeRef:
+                description: StoreRef is a reference to the OpenFGA store where this
+                  model will be applied
+                properties:
+                  name:
+                    description: Name is the name of the OpenFGAStore resource
+                    type: string
+                  namespace:
+                    description: Namespace is the namespace of the OpenFGAStore resource
+                    type: string
+                  serverRef:
+                    description: ServerRef is a reference to the OpenFGAServer
+                    properties:
+                      endpoint:
+                        description: Endpoint is the direct endpoint URL (alternative
+                          to Name/Namespace)
+                        type: string
+                      name:
+                        description: Name is the name of the OpenFGAServer resource
+                        type: string
+                      namespace:
+                        description: Namespace is the namespace of the OpenFGAServer
+                          resource
+                        type: string
+                    required:
+                    - name
+                    type: object
+                  storeID:
+                    description: StoreID is the direct OpenFGA store ID (alternative
+                      to Name/Namespace)
+                    type: string
+                type: object
+            required:
+            - schema
+            - storeRef
+            type: object
+          status:
+            description: AuthorizationModelStatus defines the observed state of AuthorizationModel
+            properties:
+              appliedAt:
+                description: AppliedAt is the timestamp when the model was successfully
+                  applied
+                format: date-time
+                type: string
+              conditions:
+                description: Conditions represent the latest available observations
+                  of the authorization model's current state
+                items:
+                  description: "Condition contains details for one aspect of the current
+                    state of this API Resource."
+                  properties:
+                    lastTransitionTime:
+                      description: lastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      format: date-time
+                      type: string
+                    message:
+                      description: message is a human readable message indicating
+                        details about the transition.
+                      maxLength: 32768
+                      type: string
+                    observedGeneration:
+                      description: observedGeneration represents the .metadata.generation
+                        that the condition was set based upon.
+                      format: int64
+                      minimum: 0
+                      type: integer
+                    reason:
+                      description: reason contains a programmatic identifier indicating
+                        the reason for the condition's last transition.
+                      maxLength: 1024
+                      minLength: 1
+                      pattern: ^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$
+                      type: string
+                    status:
+                      description: status of the condition, one of True, False, Unknown.
+                      enum:
+                      - "True"
+                      - "False"
+                      - Unknown
+                      type: string
+                    type:
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
+                      maxLength: 316
+                      pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
+                      type: string
+                  required:
+                  - lastTransitionTime
+                  - message
+                  - reason
+                  - status
+                  - type
+                  type: object
+                type: array
+              lastReconcileTime:
+                description: LastReconcileTime is the last time the resource was reconciled
+                format: date-time
+                type: string
+              modelID:
+                description: ModelID is the ID of the authorization model in OpenFGA
+                type: string
+              observedGeneration:
+                description: ObservedGeneration reflects the generation of the most
+                  recently observed AuthorizationModel
+                format: int64
+                type: integer
+              phase:
+                description: Phase represents the current phase of the authorization
+                  model
+                enum:
+                - Pending
+                - Ready
+                - Failed
+                - Unknown
+                type: string
+              storeID:
+                description: StoreID is the ID of the store where the model is deployed
+                type: string
+              validationErrors:
+                description: ValidationErrors contains any validation errors from OpenFGA
+                items:
+                  type: string
+                type: array
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
