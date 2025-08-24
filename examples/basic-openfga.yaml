@@ -1,0 +1,14 @@
+apiVersion: authorization.openfga.dev/v1alpha1
+kind: OpenFGA
+metadata:
+  name: openfga-basic
+  namespace: default
+spec:
+  replicas: 1
+  image: "openfga/openfga:latest"
+  datastore:
+    engine: "memory"
+  grpc:
+    port: 8081
+  http:
+    port: 8080
