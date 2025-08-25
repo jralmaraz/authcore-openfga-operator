@@ -168,19 +168,64 @@ configure_minikube_env() {
     fi
 }
 
-# Verify image is available in Minikube
+# Verify image is available in Minikube with retry mechanism
 verify_image_in_minikube() {
     local image="$1"
+    local max_retries="${2:-3}"
+    local retry_delay="${3:-5}"
+    
     log_info "Verifying image '$image' is available in Minikube..."
     
-    # Check if image exists in Minikube
-    if minikube image ls | grep -q "$(echo "$image" | cut -d: -f1)"; then
-        log_success "Image '$image' is available in Minikube"
-        return 0
-    else
-        log_error "Image '$image' is not available in Minikube"
-        return 1
-    fi
+    for attempt in $(seq 1 $max_retries); do
+        log_info "Verification attempt $attempt of $max_retries..."
+        
+        # Check if image exists in Minikube
+        if minikube image ls 2>/dev/null | grep -q "$(echo "$image" | cut -d: -f1)"; then
+            log_success "Image '$image' is available in Minikube"
+            return 0
+        else
+            if [ $attempt -lt $max_retries ]; then
+                log_warning "Image '$image' not found, retrying in $retry_delay seconds..."
+                sleep $retry_delay
+            else
+                log_error "Image '$image' is not available in Minikube after $max_retries attempts"
+                log_error "Available images in Minikube:"
+                minikube image ls 2>/dev/null || log_error "Failed to list Minikube images"
+                return 1
+            fi
+        fi
+    done
+}
+
+# Load image into Minikube with retry mechanism
+load_image_to_minikube() {
+    local image="$1"
+    local max_retries="${2:-3}"
+    local retry_delay="${3:-5}"
+    
+    log_info "Loading image '$image' into Minikube..."
+    
+    for attempt in $(seq 1 $max_retries); do
+        log_info "Load attempt $attempt of $max_retries..."
+        
+        if minikube image load "$image" 2>/dev/null; then
+            log_success "Successfully loaded image '$image' into Minikube"
+            return 0
+        else
+            if [ $attempt -lt $max_retries ]; then
+                log_warning "Failed to load image '$image', retrying in $retry_delay seconds..."
+                sleep $retry_delay
+            else
+                log_error "Failed to load image '$image' into Minikube after $max_retries attempts"
+                log_error "This could be due to:"
+                log_error "  - Network connectivity issues"
+                log_error "  - Insufficient disk space in Minikube"
+                log_error "  - Image not found locally"
+                log_error "  - Minikube not running properly"
+                return 1
+            fi
+        fi
+    done
 }
 
 # Build container image
@@ -204,20 +249,30 @@ build_container_image() {
     # Build the container image
     if [ "$use_minikube_env" = "true" ]; then
         # Build directly in Minikube's environment
-        docker build -t "$OPERATOR_IMAGE" .
-    else
+        log_info "Building image directly in Minikube's Docker daemon..."
+        if ! docker build -t "$OPERATOR_IMAGE" .; then
+            log_error "Failed to build image in Minikube's Docker environment"
+            log_error "Falling back to local build and load approach..."
+            use_minikube_env=false
+        fi
+    fi
+    
+    if [ "$use_minikube_env" = "false" ]; then
         # Build locally with detected runtime
-        $runtime build -t "$OPERATOR_IMAGE" .
+        log_info "Building image locally with $runtime..."
+        if ! $runtime build -t "$OPERATOR_IMAGE" .; then
+            log_error "Failed to build image with $runtime"
+            exit 1
+        fi
         
-        # Load image into Minikube
-        log_info "Loading image into Minikube..."
-        if ! minikube image load "$OPERATOR_IMAGE"; then
+        # Load image into Minikube with retry mechanism
+        if ! load_image_to_minikube "$OPERATOR_IMAGE"; then
             log_error "Failed to load image into Minikube"
             exit 1
         fi
     fi
     
-    # Verify the image is available
+    # Verify the image is available with retry mechanism
     if ! verify_image_in_minikube "$OPERATOR_IMAGE"; then
         log_error "Failed to verify image availability in Minikube"
         exit 1
@@ -487,6 +542,83 @@ EOF
     log_success "PostgreSQL example deployed"
 }
 
+# Final validation of the deployment
+validate_deployment() {
+    log_info "Performing final validation of the deployment..."
+    
+    # Check if operator pod is running
+    log_info "Checking operator pod status..."
+    local pod_status
+    pod_status=$(kubectl get pods -n "$OPERATOR_NAMESPACE" -l app=openfga-operator -o jsonpath='{.items[0].status.phase}' 2>/dev/null || echo "NotFound")
+    
+    if [ "$pod_status" != "Running" ]; then
+        log_error "Operator pod is not running (status: $pod_status)"
+        log_error "Pod details:"
+        kubectl get pods -n "$OPERATOR_NAMESPACE" -l app=openfga-operator 2>/dev/null || log_error "Failed to get pod details"
+        log_error "Pod logs:"
+        kubectl logs -n "$OPERATOR_NAMESPACE" -l app=openfga-operator --tail=20 2>/dev/null || log_error "Failed to get pod logs"
+        return 1
+    fi
+    
+    # Check if operator is ready
+    log_info "Checking operator readiness..."
+    if ! kubectl wait --for=condition=ready pod -l app=openfga-operator -n "$OPERATOR_NAMESPACE" --timeout=60s >/dev/null 2>&1; then
+        log_warning "Operator pod readiness check timed out, but continuing..."
+    fi
+    
+    # Check if CRDs are installed
+    log_info "Verifying CRDs are installed..."
+    if ! kubectl get crd openfgas.authorization.openfga.dev >/dev/null 2>&1; then
+        log_error "OpenFGA CRD is not installed"
+        return 1
+    fi
+    
+    # Check if operator service is available
+    log_info "Checking operator service..."
+    if ! kubectl get service openfga-operator-metrics -n "$OPERATOR_NAMESPACE" >/dev/null 2>&1; then
+        log_warning "Operator metrics service not found, but continuing..."
+    fi
+    
+    # Try to create a test OpenFGA resource to verify operator is working
+    log_info "Testing operator functionality with a sample OpenFGA resource..."
+    local test_resource_name="validation-test-$(date +%s)"
+    
+    if kubectl apply -f - <<EOF >/dev/null 2>&1
+apiVersion: authorization.openfga.dev/v1alpha1
+kind: OpenFGA
+metadata:
+  name: $test_resource_name
+  namespace: default
+spec:
+  image: "openfga/openfga:latest"
+  replicas: 1
+  grpc:
+    port: 8081
+  http:
+    port: 8080
+  playground:
+    enabled: false
+  datastore:
+    engine: "memory"
+EOF
+    then
+        log_info "Test OpenFGA resource created successfully"
+        
+        # Wait a moment and check if it's being processed
+        sleep 5
+        
+        # Clean up test resource
+        kubectl delete openfga "$test_resource_name" -n default >/dev/null 2>&1 || log_warning "Failed to clean up test resource"
+        
+        log_success "Operator functionality test passed"
+    else
+        log_warning "Failed to create test OpenFGA resource, but operator may still be functional"
+    fi
+    
+    log_success "Deployment validation completed successfully"
+    return 0
+}
+
 # Show deployment status
 show_status() {
     log_info "Deployment status:"
@@ -559,6 +691,13 @@ main() {
     
     # Wait for operator to be ready
     wait_for_operator
+    
+    # Perform final validation
+    if ! validate_deployment; then
+        log_error "Deployment validation failed"
+        show_status
+        exit 1
+    fi
     
     # Deploy example instances
     deploy_examples

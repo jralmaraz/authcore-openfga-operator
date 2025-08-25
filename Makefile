@@ -1,4 +1,9 @@
-.PHONY: compile build test fmt clippy clean install-crds uninstall-crds run dev deploy-dev deploy-staging deploy-prod minikube-build minikube-load minikube-deploy
+.PHONY: compile build test fmt clippy clean install-crds uninstall-crds run dev deploy-dev deploy-staging deploy-prod minikube-build minikube-load minikube-deploy minikube-deploy-registry minikube-deploy-local
+
+# Configuration
+IMAGE_REGISTRY ?= ghcr.io/jralmaraz/authcore-openfga-operator
+IMAGE_TAG ?= latest
+LOCAL_IMAGE_NAME ?= openfga-operator:latest
 
 # Default target
 all: compile build
@@ -181,13 +186,26 @@ minikube-build:
 	@echo "Building container image using Minikube's Docker environment..."
 	@if command -v docker >/dev/null 2>&1 && minikube config get driver 2>/dev/null | grep -q docker; then \
 		echo "Using Minikube's Docker environment"; \
-		eval $$(minikube docker-env) && docker build -t openfga-operator:latest .; \
+		eval $$(minikube docker-env) && docker build -t openfga-operator:latest . || { \
+			echo "Build failed in Minikube environment, falling back to local build"; \
+			$(MAKE) container-build minikube-load; \
+		}; \
 	else \
 		echo "Minikube not using Docker driver, falling back to container-build + minikube-load"; \
 		$(MAKE) container-build minikube-load; \
 	fi
 	@echo "Verifying image is available in Minikube..."
-	@minikube image ls | grep openfga-operator || { echo "Error: Image not available in Minikube"; exit 1; }
+	@for i in 1 2 3; do \
+		if minikube image ls | grep openfga-operator; then \
+			echo "✓ Image verified in Minikube"; \
+			exit 0; \
+		else \
+			echo "Image not found, attempt $$i/3..."; \
+			sleep 2; \
+		fi; \
+	done; \
+	echo "Error: Image not available in Minikube after 3 attempts"; \
+	exit 1
 
 # Load container image into Minikube
 minikube-load:
@@ -196,20 +214,97 @@ minikube-load:
 		echo "Using Minikube's Docker environment to verify image..."; \
 		eval $$(minikube docker-env) && docker images | grep openfga-operator || { \
 			echo "Image not found in Minikube's Docker environment, loading..."; \
-			minikube image load openfga-operator:latest; \
+			for i in 1 2 3; do \
+				if minikube image load openfga-operator:latest; then \
+					echo "✓ Image loaded successfully"; \
+					break; \
+				else \
+					echo "Load attempt $$i failed, retrying..."; \
+					sleep 2; \
+				fi; \
+			done; \
 		}; \
 	else \
 		echo "Loading image using minikube image load..."; \
-		minikube image load openfga-operator:latest; \
+		for i in 1 2 3; do \
+			if minikube image load openfga-operator:latest; then \
+				echo "✓ Image loaded successfully"; \
+				break; \
+			else \
+				echo "Load attempt $$i failed, retrying..."; \
+				sleep 2; \
+			fi; \
+		done; \
 	fi
 	@echo "Verifying image is available in Minikube..."
-	@minikube image ls | grep openfga-operator || { echo "Error: Image not available in Minikube"; exit 1; }
+	@for i in 1 2 3; do \
+		if minikube image ls | grep openfga-operator; then \
+			echo "✓ Image verified in Minikube"; \
+			exit 0; \
+		else \
+			echo "Verification attempt $$i/3 failed..."; \
+			sleep 2; \
+		fi; \
+	done; \
+	echo "Error: Image not available in Minikube after verification"; \
+	exit 1
 
-# Deploy to Minikube (requires image to be built and loaded)
-minikube-deploy: minikube-build install-crds
-	@echo "Deploying to Minikube..."
+# Deploy to Minikube using registry image (recommended for reliability)
+minikube-deploy-registry: install-crds
+	@echo "Deploying to Minikube using registry image..."
+	@echo "Using image: $(IMAGE_REGISTRY):$(IMAGE_TAG)"
 	kubectl create namespace openfga-system --dry-run=client -o yaml | kubectl apply -f -
-	kubectl apply -f - <<< 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: openfga-operator\n  namespace: openfga-system\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: openfga-operator\n  template:\n    metadata:\n      labels:\n        app: openfga-operator\n    spec:\n      containers:\n      - name: operator\n        image: openfga-operator:latest\n        imagePullPolicy: Never\n        ports:\n        - containerPort: 8080'
+	kubectl apply -f - <<< 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: openfga-operator\n  namespace: openfga-system\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: openfga-operator\n  template:\n    metadata:\n      labels:\n        app: openfga-operator\n    spec:\n      containers:\n      - name: operator\n        image: $(IMAGE_REGISTRY):$(IMAGE_TAG)\n        imagePullPolicy: Always\n        ports:\n        - containerPort: 8080'
+
+# Deploy to Minikube using local image (requires image to be built and loaded)
+minikube-deploy-local: minikube-build install-crds
+	@echo "Deploying to Minikube using local image..."
+	kubectl create namespace openfga-system --dry-run=client -o yaml | kubectl apply -f -
+	kubectl apply -f - <<< 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: openfga-operator\n  namespace: openfga-system\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: openfga-operator\n  template:\n    metadata:\n      labels:\n        app: openfga-operator\n    spec:\n      containers:\n      - name: operator\n        image: $(LOCAL_IMAGE_NAME)\n        imagePullPolicy: Never\n        ports:\n        - containerPort: 8080'
+
+# Deploy to Minikube (legacy - uses local build)
+minikube-deploy: minikube-deploy-local
+
+# Validate Minikube deployment (works with both registry and local images)
+minikube-validate:
+	@echo "Validating Minikube deployment..."
+	@echo "Checking Minikube status..."
+	@minikube status || { echo "Error: Minikube is not running"; exit 1; }
+	@echo "Checking operator deployment..."
+	@kubectl get deployment openfga-operator -n openfga-system || { echo "Error: Operator deployment not found"; exit 1; }
+	@echo "Checking operator pod status..."
+	@kubectl wait --for=condition=ready pod -l app=openfga-operator -n openfga-system --timeout=120s || { \
+		echo "Error: Operator pod not ready"; \
+		kubectl get pods -n openfga-system; \
+		kubectl logs -n openfga-system -l app=openfga-operator --tail=10; \
+		exit 1; \
+	}
+	@echo "Checking CRDs..."
+	@kubectl get crd openfgas.authorization.openfga.dev || { echo "Error: OpenFGA CRD not found"; exit 1; }
+	@echo "✓ All validation checks passed!"
+
+# Complete Minikube setup and deployment with validation (registry-based, recommended)
+minikube-setup-and-deploy-registry: minikube-deploy-registry minikube-validate
+	@echo "✓ Minikube deployment completed successfully using registry image!"
+	@echo ""
+	@echo "Image used: $(IMAGE_REGISTRY):$(IMAGE_TAG)"
+	@echo ""
+	@echo "Next steps:"
+	@echo "1. Run './scripts/minikube/validate-deployment.sh' for additional validation"
+	@echo "2. Access OpenFGA API: kubectl port-forward service/openfga-basic-http 8080:8080"
+	@echo "3. Deploy demo applications: cd demos/banking-app && kubectl apply -f k8s/"
+
+# Complete Minikube setup and deployment with validation (local build)
+minikube-setup-and-deploy-local: minikube-deploy-local minikube-validate
+	@echo "✓ Minikube deployment completed successfully using local image!"
+	@echo ""
+	@echo "Next steps:"
+	@echo "1. Run './scripts/minikube/validate-deployment.sh' for additional validation"
+	@echo "2. Access OpenFGA API: kubectl port-forward service/openfga-basic-http 8080:8080"
+	@echo "3. Deploy demo applications: cd demos/banking-app && kubectl apply -f k8s/"
+
+# Complete Minikube setup and deployment with validation (legacy - uses local build)
+minikube-setup-and-deploy: minikube-setup-and-deploy-local
 
 # Run all quality checks
 check-all: fmt clippy compile test check-kustomize
@@ -236,7 +331,13 @@ help:
 	@echo "  deploy-prod  - Deploy to production environment"
 	@echo "  minikube-build - Build container image using Minikube's Docker environment"
 	@echo "  minikube-load - Load container image into Minikube"
-	@echo "  minikube-deploy - Build and deploy to Minikube"
+	@echo "  minikube-deploy - Build and deploy to Minikube (legacy, uses local build)"
+	@echo "  minikube-deploy-registry - Deploy to Minikube using registry image (recommended)"
+	@echo "  minikube-deploy-local - Deploy to Minikube using local build"
+	@echo "  minikube-validate - Validate Minikube deployment"
+	@echo "  minikube-setup-and-deploy - Complete setup with local build (legacy)"
+	@echo "  minikube-setup-and-deploy-registry - Complete setup with registry image (recommended)"
+	@echo "  minikube-setup-and-deploy-local - Complete setup with local build"
 	@echo "  verify-deployment - Verify deployment status"
 	@echo "  check-kustomize - Validate kustomize configurations"
 	@echo "  clean-dev    - Clean up development deployment"
@@ -247,3 +348,14 @@ help:
 	@echo ""
 	@echo "Environment variables:"
 	@echo "  CONTAINER_RUNTIME - Set container runtime (docker|podman)"
+	@echo "  IMAGE_REGISTRY   - Container registry for deployment (default: ghcr.io/jralmaraz/authcore-openfga-operator)"
+	@echo "  IMAGE_TAG        - Image tag for deployment (default: latest)"
+	@echo "  LOCAL_IMAGE_NAME - Local image name for build (default: openfga-operator:latest)"
+	@echo ""
+	@echo "Registry-based deployment (recommended for reliability):"
+	@echo "  make minikube-deploy-registry              # Deploy using GHCR image"
+	@echo "  make minikube-setup-and-deploy-registry    # Complete setup with GHCR image"
+	@echo ""
+	@echo "Local build deployment (for development):"
+	@echo "  make minikube-deploy-local                 # Deploy using local build"
+	@echo "  make minikube-setup-and-deploy-local       # Complete setup with local build"

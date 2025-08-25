@@ -111,27 +111,71 @@ For local development and testing, use our comprehensive Minikube guides:
 
 #### Automated Setup Scripts
 
-For quick deployment, use our automation scripts:
+For reliable deployment, we now recommend using our enhanced deployment script with GitHub Container Registry integration:
 
 ```bash
-# Linux/macOS - Setup with Docker (default)
-./scripts/minikube/setup-minikube.sh
-./scripts/minikube/deploy-operator.sh
+# Enhanced deployment script (recommended)
+./scripts/minikube/deploy-operator-enhanced.sh
+```
 
-# Linux/macOS - Setup with Podman
-./scripts/minikube/setup-minikube.sh --runtime podman
-CONTAINER_RUNTIME=podman ./scripts/minikube/deploy-operator.sh
+This interactive script offers:
+- **Registry-based deployment** (recommended): Uses pre-built images from GitHub Container Registry
+- **Local build deployment**: Builds images locally for development
+- **Automatic fallback**: Tries alternative methods if the first one fails
+- **Comprehensive validation**: Ensures successful deployment
+
+#### Legacy Scripts (Manual Choice)
+
+For manual control over deployment method:
+
+```bash
+# Registry-based deployment (recommended for reliability)
+make minikube-setup-and-deploy-registry
+
+# Local build deployment (for development)
+make minikube-setup-and-deploy-local
+
+# Validate deployment
+make minikube-validate
+```
+
+#### Platform-Specific Instructions
+
+```bash
+# Linux/macOS - Setup Minikube first
+./scripts/minikube/setup-minikube.sh
+
+# Then deploy using enhanced script
+./scripts/minikube/deploy-operator-enhanced.sh
+
+# Or deploy manually
+make minikube-setup-and-deploy-registry  # Recommended
+# OR
+make minikube-setup-and-deploy-local     # For development
+
+# Validate deployment
 ./scripts/minikube/validate-deployment.sh
 
-# Windows PowerShell - Setup with Docker (default)
+# Windows PowerShell - Setup Minikube first
 .\scripts\minikube\setup-minikube.ps1
-.\scripts\minikube\deploy-operator.ps1
 
-# Windows PowerShell - Setup with Podman
-.\scripts\minikube\setup-minikube.ps1 -Runtime podman
-$env:CONTAINER_RUNTIME="podman"; .\scripts\minikube\deploy-operator.ps1
+# Then deploy (enhanced script not yet available for PowerShell)
+make minikube-setup-and-deploy-registry  # Recommended
+# OR
+make minikube-setup-and-deploy-local     # For development
+
+# Validate deployment
 .\scripts\minikube\validate-deployment.ps1
 ```
+
+#### Deployment Methods Comparison
+
+| Method | Reliability | Speed | Use Case |
+|--------|-------------|-------|----------|
+| **Registry-based** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | Production, Testing, CI/CD |
+| **Local build** | ⭐⭐⭐ | ⭐⭐ | Development, Custom changes |
+
+The registry-based approach resolves the "image is not known and cannot be cached" issues by using pre-built, tested images from GitHub Container Registry.
 
 ### Production Installation
 
