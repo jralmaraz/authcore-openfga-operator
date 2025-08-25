@@ -1,6 +1,29 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[derive(Debug, Clone)]
+pub struct AccountParams {
+    pub id: String,
+    pub account_number: String,
+    pub parent_branch_id: String,
+    pub owners: Vec<String>,
+    pub co_owners: Vec<String>,
+    pub balance: f64,
+    pub account_type: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct LoanParams {
+    pub id: String,
+    pub parent_branch_id: String,
+    pub borrower_id: String,
+    pub co_borrowers: Vec<String>,
+    pub loan_officer_id: String,
+    pub amount: f64,
+    pub status: String,
+    pub interest_rate: f64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BankingUser {
     pub id: String,
@@ -158,8 +181,21 @@ impl BankingDemo {
         });
     }
 
+    pub fn add_account_with_params(&mut self, params: AccountParams) {
+        self.accounts.insert(params.id.clone(), Account {
+            id: params.id,
+            account_number: params.account_number,
+            parent_branch_id: params.parent_branch_id,
+            owners: params.owners,
+            co_owners: params.co_owners,
+            balance: params.balance,
+            account_type: params.account_type,
+        });
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn add_account(&mut self, id: &str, account_number: &str, parent_branch_id: &str, owners: Vec<String>, co_owners: Vec<String>, balance: f64, account_type: &str) {
-        self.accounts.insert(id.to_string(), Account {
+        let params = AccountParams {
             id: id.to_string(),
             account_number: account_number.to_string(),
             parent_branch_id: parent_branch_id.to_string(),
@@ -167,11 +203,26 @@ impl BankingDemo {
             co_owners,
             balance,
             account_type: account_type.to_string(),
+        };
+        self.add_account_with_params(params);
+    }
+
+    pub fn add_loan_with_params(&mut self, params: LoanParams) {
+        self.loans.insert(params.id.clone(), Loan {
+            id: params.id,
+            parent_branch_id: params.parent_branch_id,
+            borrower_id: params.borrower_id,
+            co_borrowers: params.co_borrowers,
+            loan_officer_id: params.loan_officer_id,
+            amount: params.amount,
+            status: params.status,
+            interest_rate: params.interest_rate,
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn add_loan(&mut self, id: &str, parent_branch_id: &str, borrower_id: &str, co_borrowers: Vec<String>, loan_officer_id: &str, amount: f64, status: &str, interest_rate: f64) {
-        self.loans.insert(id.to_string(), Loan {
+        let params = LoanParams {
             id: id.to_string(),
             parent_branch_id: parent_branch_id.to_string(),
             borrower_id: borrower_id.to_string(),
@@ -180,7 +231,8 @@ impl BankingDemo {
             amount,
             status: status.to_string(),
             interest_rate,
-        });
+        };
+        self.add_loan_with_params(params);
     }
 
     pub fn add_transaction(&mut self, id: &str, source_account_id: Option<String>, target_account_id: &str, initiated_by: &str, amount: f64, transaction_type: &str) {

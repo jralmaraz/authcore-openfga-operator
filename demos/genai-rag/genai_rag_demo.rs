@@ -1,6 +1,40 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+#[derive(Debug, Clone)]
+pub struct KnowledgeBaseParams {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub parent_org_id: String,
+    pub curators: Vec<String>,
+    pub contributors: Vec<String>,
+    pub readers: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DocumentParams {
+    pub id: String,
+    pub title: String,
+    pub content: String,
+    pub parent_kb_id: String,
+    pub owner_id: String,
+    pub editors: Vec<String>,
+    pub viewers: Vec<String>,
+    pub tags: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RAGQueryParams {
+    pub id: String,
+    pub parent_session_id: String,
+    pub initiated_by: String,
+    pub query_text: String,
+    pub queried_documents: Vec<String>,
+    pub response_text: String,
+    pub confidence_score: f64,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GenAIUser {
     pub id: String,
@@ -174,8 +208,21 @@ impl GenAIRAGDemo {
         });
     }
 
+    pub fn add_knowledge_base_with_params(&mut self, params: KnowledgeBaseParams) {
+        self.knowledge_bases.insert(params.id.clone(), KnowledgeBase {
+            id: params.id,
+            name: params.name,
+            description: params.description,
+            parent_org_id: params.parent_org_id,
+            curators: params.curators,
+            contributors: params.contributors,
+            readers: params.readers,
+        });
+    }
+
+    #[allow(clippy::too_many_arguments)]
     pub fn add_knowledge_base(&mut self, id: &str, name: &str, description: &str, parent_org_id: &str, curators: Vec<String>, contributors: Vec<String>, readers: Vec<String>) {
-        self.knowledge_bases.insert(id.to_string(), KnowledgeBase {
+        let params = KnowledgeBaseParams {
             id: id.to_string(),
             name: name.to_string(),
             description: description.to_string(),
@@ -183,12 +230,29 @@ impl GenAIRAGDemo {
             curators,
             contributors,
             readers,
+        };
+        self.add_knowledge_base_with_params(params);
+    }
+
+    pub fn add_document_with_params(&mut self, params: DocumentParams) {
+        let timestamp = chrono::Utc::now().to_rfc3339();
+        self.documents.insert(params.id.clone(), Document {
+            id: params.id,
+            title: params.title,
+            content: params.content,
+            parent_kb_id: params.parent_kb_id,
+            owner_id: params.owner_id,
+            editors: params.editors,
+            viewers: params.viewers,
+            tags: params.tags,
+            created_at: timestamp.clone(),
+            updated_at: timestamp,
         });
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn add_document(&mut self, id: &str, title: &str, content: &str, parent_kb_id: &str, owner_id: &str, editors: Vec<String>, viewers: Vec<String>, tags: Vec<String>) {
-        let timestamp = chrono::Utc::now().to_rfc3339();
-        self.documents.insert(id.to_string(), Document {
+        let params = DocumentParams {
             id: id.to_string(),
             title: title.to_string(),
             content: content.to_string(),
@@ -197,9 +261,8 @@ impl GenAIRAGDemo {
             editors,
             viewers,
             tags,
-            created_at: timestamp.clone(),
-            updated_at: timestamp,
-        });
+        };
+        self.add_document_with_params(params);
     }
 
     pub fn add_ai_model(&mut self, id: &str, name: &str, model_type: &str, parent_org_id: &str, operators: Vec<String>, users: Vec<String>) {
@@ -232,18 +295,32 @@ impl GenAIRAGDemo {
         });
     }
 
-    pub fn add_rag_query(&mut self, id: &str, parent_session_id: &str, initiated_by: &str, query_text: &str, queried_documents: Vec<String>, response_text: &str, confidence_score: f64) {
+    pub fn add_rag_query_with_params(&mut self, params: RAGQueryParams) {
         let timestamp = chrono::Utc::now().to_rfc3339();
-        self.rag_queries.insert(id.to_string(), RAGQuery {
+        self.rag_queries.insert(params.id.clone(), RAGQuery {
+            id: params.id,
+            parent_session_id: params.parent_session_id,
+            initiated_by: params.initiated_by,
+            query_text: params.query_text,
+            queried_documents: params.queried_documents,
+            response_text: params.response_text,
+            timestamp,
+            confidence_score: params.confidence_score,
+        });
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_rag_query(&mut self, id: &str, parent_session_id: &str, initiated_by: &str, query_text: &str, queried_documents: Vec<String>, response_text: &str, confidence_score: f64) {
+        let params = RAGQueryParams {
             id: id.to_string(),
             parent_session_id: parent_session_id.to_string(),
             initiated_by: initiated_by.to_string(),
             query_text: query_text.to_string(),
             queried_documents,
             response_text: response_text.to_string(),
-            timestamp,
             confidence_score,
-        });
+        };
+        self.add_rag_query_with_params(params);
     }
 
     fn setup_authorization_tuples(&mut self) {
