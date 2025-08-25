@@ -4,6 +4,8 @@
 param(
     [switch]$SkipChocolatey,
     [switch]$SkipDocker,
+    [ValidateSet("docker", "podman")]
+    [string]$Runtime = "",
     [switch]$Force
 )
 
@@ -40,6 +42,41 @@ function Test-CommandExists($command) {
     return $?
 }
 
+# Detect available container runtime
+function Get-ContainerRuntime {
+    # Check environment variable first
+    if ($env:CONTAINER_RUNTIME) {
+        switch ($env:CONTAINER_RUNTIME.ToLower()) {
+            "docker" {
+                if (Test-CommandExists "docker") {
+                    return "docker"
+                } else {
+                    Write-Warning "Specified runtime '$($env:CONTAINER_RUNTIME)' not found, falling back to auto-detection"
+                }
+            }
+            "podman" {
+                if (Test-CommandExists "podman") {
+                    return "podman"
+                } else {
+                    Write-Warning "Specified runtime '$($env:CONTAINER_RUNTIME)' not found, falling back to auto-detection"
+                }
+            }
+            default {
+                Write-Warning "Invalid CONTAINER_RUNTIME '$($env:CONTAINER_RUNTIME)', falling back to auto-detection"
+            }
+        }
+    }
+    
+    # Auto-detect available runtime
+    if (Test-CommandExists "docker") {
+        return "docker"
+    } elseif (Test-CommandExists "podman") {
+        return "podman"
+    } else {
+        return ""
+    }
+}
+
 # Check Windows version
 function Test-WindowsVersion {
     $version = [System.Environment]::OSVersion.Version
@@ -70,6 +107,24 @@ function Install-Chocolatey {
     $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
     
     Write-Success "Chocolatey installed successfully"
+}
+
+# Install container runtime
+function Install-ContainerRuntime {
+    param(
+        [Parameter(Mandatory=$false)]
+        [ValidateSet("docker", "podman")]
+        [string]$Runtime = "docker"
+    )
+    
+    switch ($Runtime.ToLower()) {
+        "docker" {
+            Install-DockerDesktop
+        }
+        "podman" {
+            Install-PodmanDesktop
+        }
+    }
 }
 
 # Install Docker Desktop
@@ -103,6 +158,52 @@ function Install-DockerDesktop {
     $response = Read-Host "Have you installed Docker Desktop? (y/N)"
     if ($response -notmatch "^[Yy]") {
         Write-Error-Custom "Docker Desktop is required. Please install it and run this script again."
+        exit 1
+    }
+}
+
+# Install Podman Desktop
+function Install-PodmanDesktop {
+    Write-Info "Checking Podman installation..."
+    
+    if (Test-CommandExists "podman") {
+        Write-Info "Podman is already installed"
+        
+        # Test Podman
+        try {
+            podman --version | Out-Null
+            Write-Success "Podman is working"
+            return
+        }
+        catch {
+            Write-Warning "Podman is installed but not working properly"
+        }
+    }
+    
+    Write-Info "Installing Podman Desktop..."
+    Write-Info "Please download and install Podman Desktop from: https://podman-desktop.io/"
+    Write-Info "Or install via winget: winget install RedHat.Podman-Desktop"
+    
+    # Try to install via winget if available
+    if (Test-CommandExists "winget") {
+        Write-Info "Attempting to install Podman Desktop via winget..."
+        try {
+            winget install RedHat.Podman-Desktop --accept-package-agreements --accept-source-agreements
+            Write-Success "Podman Desktop installed via winget"
+            
+            # Refresh environment variables
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            
+            return
+        }
+        catch {
+            Write-Warning "Failed to install via winget, manual installation required"
+        }
+    }
+    
+    $response = Read-Host "Have you installed Podman Desktop? (y/N)"
+    if ($response -notmatch "^[Yy]") {
+        Write-Error-Custom "Podman Desktop is required. Please install it and run this script again."
         exit 1
     }
 }
@@ -216,22 +317,43 @@ function Start-Minikube {
         # Minikube not running or not configured
     }
     
-    # Try to start with Docker driver
-    Write-Info "Starting Minikube with Docker driver..."
-    try {
-        minikube start --driver=docker --memory=4096 --cpus=2
-        Write-Success "Minikube started with Docker driver"
+    # Detect container runtime for Minikube driver
+    $runtime = Get-ContainerRuntime
+    
+    $driver = ""
+    switch ($runtime) {
+        "docker" {
+            $driver = "docker"
+        }
+        "podman" {
+            $driver = "podman"
+        }
+        default {
+            Write-Warning "No container runtime detected, trying alternative drivers..."
+        }
     }
-    catch {
-        Write-Warning "Docker driver failed, trying Hyper-V driver..."
+    
+    # Try detected runtime driver first
+    if ($driver) {
+        Write-Info "Starting Minikube with $driver driver..."
         try {
-            minikube start --driver=hyperv --memory=4096 --cpus=2
-            Write-Success "Minikube started with Hyper-V driver"
+            minikube start --driver=$driver --memory=4096 --cpus=2
+            Write-Success "Minikube started with $driver driver"
+            return
         }
         catch {
-            Write-Error-Custom "Failed to start Minikube. Please check your virtualization settings."
-            throw
+            Write-Warning "$driver driver failed, trying Hyper-V driver..."
         }
+    }
+    
+    # Try Hyper-V as fallback
+    try {
+        minikube start --driver=hyperv --memory=4096 --cpus=2
+        Write-Success "Minikube started with Hyper-V driver"
+    }
+    catch {
+        Write-Error-Custom "Failed to start Minikube. Please check your virtualization settings."
+        throw
     }
     
     # Enable addons
@@ -248,13 +370,19 @@ function Test-Installation {
     
     $issues = 0
     
-    # Test Docker
-    try {
-        docker --version | Out-Null
-        Write-Success "Docker is working"
-    }
-    catch {
-        Write-Error-Custom "Docker is not working properly"
+    # Test container runtime
+    $runtime = Get-ContainerRuntime
+    if ($runtime) {
+        try {
+            & $runtime --version | Out-Null
+            Write-Success "$runtime is working"
+        }
+        catch {
+            Write-Error-Custom "$runtime is not working properly"
+            $issues++
+        }
+    } else {
+        Write-Error-Custom "No container runtime is working properly"
         $issues++
     }
     
@@ -311,6 +439,12 @@ function Main {
     Write-Host "==========================================" -ForegroundColor Cyan
     Write-Host ""
     
+    # Set runtime preference if specified
+    if ($Runtime) {
+        $env:CONTAINER_RUNTIME = $Runtime
+        Write-Info "Using container runtime: $Runtime"
+    }
+    
     # Check if running as administrator
     if (-not (Test-IsAdmin)) {
         Write-Error-Custom "This script must be run as Administrator"
@@ -335,8 +469,15 @@ function Main {
             Install-Chocolatey
         }
         
-        # Install Docker Desktop
-        Install-DockerDesktop
+        # Install container runtime
+        $currentRuntime = Get-ContainerRuntime
+        if (-not $currentRuntime) {
+            $runtimeToInstall = if ($Runtime) { $Runtime } else { "docker" }
+            Write-Info "Installing container runtime: $runtimeToInstall"
+            Install-ContainerRuntime -Runtime $runtimeToInstall
+        } else {
+            Write-Info "Using existing container runtime: $currentRuntime"
+        }
         
         # Install tools
         Install-Tools

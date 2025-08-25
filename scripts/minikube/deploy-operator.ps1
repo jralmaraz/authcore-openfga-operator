@@ -38,6 +38,41 @@ function Test-CommandExists($command) {
     return $?
 }
 
+# Detect available container runtime
+function Get-ContainerRuntime {
+    # Check environment variable first
+    if ($env:CONTAINER_RUNTIME) {
+        switch ($env:CONTAINER_RUNTIME.ToLower()) {
+            "docker" {
+                if (Test-CommandExists "docker") {
+                    return "docker"
+                } else {
+                    Write-Warning "Specified runtime '$($env:CONTAINER_RUNTIME)' not found, falling back to auto-detection"
+                }
+            }
+            "podman" {
+                if (Test-CommandExists "podman") {
+                    return "podman"
+                } else {
+                    Write-Warning "Specified runtime '$($env:CONTAINER_RUNTIME)' not found, falling back to auto-detection"
+                }
+            }
+            default {
+                Write-Warning "Invalid CONTAINER_RUNTIME '$($env:CONTAINER_RUNTIME)', falling back to auto-detection"
+            }
+        }
+    }
+    
+    # Auto-detect available runtime
+    if (Test-CommandExists "docker") {
+        return "docker"
+    } elseif (Test-CommandExists "podman") {
+        return "podman"
+    } else {
+        return ""
+    }
+}
+
 # Check prerequisites
 function Test-Prerequisites {
     Write-Info "Checking prerequisites..."
@@ -54,9 +89,13 @@ function Test-Prerequisites {
         $issues++
     }
     
-    if (-not (Test-CommandExists "docker")) {
-        Write-Error-Custom "docker is not installed. Please run setup-minikube.ps1 first."
+    # Check for any container runtime
+    $runtime = Get-ContainerRuntime
+    if (-not $runtime) {
+        Write-Error-Custom "No container runtime (Docker or Podman) is installed. Please run setup-minikube.ps1 first."
         $issues++
+    } else {
+        Write-Info "Using container runtime: $runtime"
     }
     
     if (-not (Test-CommandExists "cargo")) {
@@ -103,20 +142,31 @@ function Build-Operator {
     Write-Success "Operator build completed"
 }
 
-# Build Docker image
-function Build-DockerImage {
-    Write-Info "Building Docker image..."
+# Build container image
+function Build-ContainerImage {
+    $runtime = Get-ContainerRuntime
+    if (-not $runtime) {
+        Write-Error-Custom "No container runtime found. Please install Docker or Podman."
+        exit 1
+    }
+    
+    Write-Info "Building container image using $runtime..."
     
     Set-Location $ProjectRoot
     
-    # Build the Docker image
-    docker build -t $OperatorImage .
+    # Build the container image
+    & $runtime build -t $OperatorImage .
     
     # Load image into Minikube
     Write-Info "Loading image into Minikube..."
     minikube image load $OperatorImage
     
-    Write-Success "Docker image built and loaded into Minikube"
+    Write-Success "Container image built and loaded into Minikube"
+}
+
+# Legacy function for backward compatibility
+function Build-DockerImage {
+    Build-ContainerImage
 }
 
 # Install CRDs
@@ -433,8 +483,8 @@ function Main {
         # Build the operator
         Build-Operator
         
-        # Build Docker image
-        Build-DockerImage
+        # Build container image
+        Build-ContainerImage
         
         # Install CRDs
         Install-CRDs
