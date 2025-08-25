@@ -23,3 +23,8 @@ kubeconfig
 # Build artifacts
 /dist/
 /build/
+
+# Demo environment files
+.env.docker
+.env.docker.bak
+.openfga-config.json

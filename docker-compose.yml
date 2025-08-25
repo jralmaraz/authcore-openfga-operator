@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # OpenFGA Service
+  openfga:
+    image: openfga/openfga:latest
+    container_name: openfga
+    command: run
+    environment:
+      - OPENFGA_DATASTORE_ENGINE=memory
+      - OPENFGA_LOG_FORMAT=text
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - demo-network
+
+  # Banking Application
+  banking-app:
+    build:
+      context: ./demos/banking-app
+      dockerfile: Dockerfile
+    container_name: banking-app
+    environment:
+      - NODE_ENV=development
+      - PORT=3000
+      - OPENFGA_API_URL=http://openfga:8080
+      - OPENFGA_STORE_ID=${BANKING_STORE_ID:-}
+      - OPENFGA_AUTH_MODEL_ID=${BANKING_AUTH_MODEL_ID:-}
+    ports:
+      - "3001:3000"
+    depends_on:
+      openfga:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    volumes:
+      - ./demos/banking-app:/app
+      - /app/node_modules
+    networks:
+      - demo-network
+
+  # GenAI RAG Agent
+  genai-rag-agent:
+    build:
+      context: ./demos/genai-rag-agent
+      dockerfile: Dockerfile
+    container_name: genai-rag-agent
+    environment:
+      - ENVIRONMENT=development
+      - HOST=0.0.0.0
+      - PORT=8000
+      - OPENFGA_API_URL=http://openfga:8080
+      - OPENFGA_STORE_ID=${GENAI_STORE_ID:-}
+      - OPENFGA_AUTH_MODEL_ID=${GENAI_AUTH_MODEL_ID:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - DEMO_MODE=true
+    ports:
+      - "8001:8000"
+    depends_on:
+      openfga:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    volumes:
+      - ./demos/genai-rag-agent:/app
+    networks:
+      - demo-network
+
+  # Setup service for demo data initialization
+  demo-setup:
+    image: curlimages/curl:latest
+    container_name: demo-setup
+    depends_on:
+      banking-app:
+        condition: service_healthy
+      genai-rag-agent:
+        condition: service_healthy
+    command: >
+      sh -c "
+        echo 'Waiting for services to be ready...' &&
+        sleep 10 &&
+        echo 'Services are ready. Demo setup complete!' &&
+        echo 'Banking App: http://localhost:3001' &&
+        echo 'GenAI RAG Agent: http://localhost:8001' &&
+        echo 'OpenFGA API: http://localhost:8080'
+      "
+    networks:
+      - demo-network
+
+networks:
+  demo-network:
+    driver: bridge
+
+volumes:
+  openfga_data:

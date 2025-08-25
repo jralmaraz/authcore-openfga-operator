@@ -51,9 +51,45 @@ The OpenFGA Operator provides a Kubernetes-native way to deploy and manage OpenF
 ### 🎯 Demo Applications
 - **[Banking Application Demo](demos/banking-app/)**: Complete banking microservice with fine-grained authorization
 - **[GenAI RAG Agent Demo](demos/genai-rag-agent/)**: AI-powered RAG agent with OpenFGA authorization
+- **[Demo Deployment Scripts](scripts/minikube/README.md)**: Comprehensive deployment automation for all demo applications
 - **[Demo Overview](demos/README.md)**: Introduction to all demonstration applications
 - **[Demo Deployment Scripts](scripts/README.md)**: Automated deployment scripts for local testing
 - **[Quick Start Guide](DEMO_QUICKSTART.md)**: 5-minute demo setup guide
+
+#### 🚀 Quick Demo Deployment
+
+**Docker Compose (Recommended for Local Development):**
+```bash
+# Deploy all demo applications with Docker Compose
+./scripts/minikube/deploy-demos-docker.sh
+
+# Access the applications:
+# Banking App: http://localhost:3001
+# GenAI RAG Agent: http://localhost:8001/docs
+# OpenFGA API: http://localhost:8080
+```
+
+**Minikube Deployment:**
+```bash
+# Deploy operator first (if not already deployed)
+./scripts/minikube/deploy-operator.sh
+
+# Deploy all demo applications
+./scripts/minikube/deploy-demos.sh
+
+# Validate deployment
+./scripts/minikube/validate-demos.sh
+```
+
+**Windows PowerShell:**
+```powershell
+# Deploy all demo applications
+.\scripts\minikube\deploy-demos.ps1
+
+# Deploy specific applications
+.\scripts\minikube\deploy-demos.ps1 -Banking  # Banking app only
+.\scripts\minikube\deploy-demos.ps1 -GenAI    # GenAI app only
+```
 
 ## Prerequisites
 
