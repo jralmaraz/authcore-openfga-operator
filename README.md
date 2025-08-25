@@ -52,6 +52,8 @@ The OpenFGA Operator provides a Kubernetes-native way to deploy and manage OpenF
 - **[Banking Application Demo](demos/banking-app/)**: Complete banking microservice with fine-grained authorization
 - **[GenAI RAG Agent Demo](demos/genai-rag-agent/)**: AI-powered RAG agent with OpenFGA authorization
 - **[Demo Overview](demos/README.md)**: Introduction to all demonstration applications
+- **[Demo Deployment Scripts](scripts/README.md)**: Automated deployment scripts for local testing
+- **[Quick Start Guide](DEMO_QUICKSTART.md)**: 5-minute demo setup guide
 
 ## Prerequisites
 
@@ -218,6 +220,57 @@ spec:
   http:
     port: 8080
 ```
+
+## Demo Applications Deployment
+
+For local testing and demonstrations, use our automated deployment scripts to quickly deploy fully functional demo applications with OpenFGA authorization:
+
+### Quick Demo Setup
+
+```bash
+# Deploy both banking and GenAI RAG demos with one command
+./scripts/deploy-demos.sh
+
+# Or deploy individual demos
+./scripts/deploy-banking-demo.sh  # Banking application
+./scripts/deploy-genai-demo.sh    # GenAI RAG agent
+```
+
+### Demo Applications Overview
+
+- **Banking Demo**: Role-based authorization for financial services with accounts, transactions, and loans
+- **GenAI RAG Demo**: Knowledge base access control for AI applications with document-level permissions
+
+### Access Demo Applications
+
+```bash
+# Banking Demo (after deployment)
+kubectl port-forward service/banking-demo-service 3000:80
+curl http://localhost:3000/api/accounts
+
+# GenAI RAG Demo (after deployment)  
+kubectl port-forward service/genai-rag-agent-service 8000:80
+curl -H 'x-user-id: alice' http://localhost:8000/api/knowledge-bases
+```
+
+### Demo Management
+
+```bash
+# Check demo status
+./scripts/deploy-demos.sh --status
+
+# Test existing deployments
+./scripts/deploy-demos.sh --test-only
+
+# Clean up all demos
+./scripts/deploy-demos.sh --cleanup
+```
+
+For detailed information, see:
+- **[Demo Deployment Scripts Documentation](scripts/README.md)**
+- **[Quick Start Guide](DEMO_QUICKSTART.md)**
+- **[Banking Demo Details](demos/banking-app/README.md)**
+- **[GenAI RAG Demo Details](demos/genai-rag-agent/README.md)**
 
 ## Security Implementation
 
