@@ -517,9 +517,25 @@ echo "Banking app available at http://localhost:3000"
    # Verify image is loaded
    minikube image ls | grep openfga-operator
    
-   # Reload image if needed
+   # Option 1: Use improved Minikube build (recommended)
+   make minikube-build
+   
+   # Option 2: Reload image if needed (fallback)
    docker build -t openfga-operator:latest .
    minikube image load openfga-operator:latest
+   ```
+
+4. **Image not available in Minikube cluster:**
+   ```bash
+   # Use Minikube's Docker environment to build directly
+   eval $(minikube docker-env)
+   docker build -t openfga-operator:latest .
+   
+   # Verify image is now available
+   minikube image ls | grep openfga-operator
+   
+   # Reset your shell environment when done
+   eval $(minikube docker-env -u)
    ```
 
 4. **DNS resolution issues:**

@@ -1,4 +1,4 @@
-.PHONY: compile build test fmt clippy clean install-crds uninstall-crds run dev deploy-dev deploy-staging deploy-prod
+.PHONY: compile build test fmt clippy clean install-crds uninstall-crds run dev deploy-dev deploy-staging deploy-prod minikube-build minikube-load minikube-deploy
 
 # Default target
 all: compile build
@@ -176,13 +176,37 @@ clean-prod:
 	@echo "Cleaning up production deployment..."
 	kubectl delete -k kustomize/overlays/prod/ --ignore-not-found=true
 
+# Build container image using Minikube's docker environment
+minikube-build:
+	@echo "Building container image using Minikube's Docker environment..."
+	@if command -v docker >/dev/null 2>&1 && minikube config get driver 2>/dev/null | grep -q docker; then \
+		echo "Using Minikube's Docker environment"; \
+		eval $$(minikube docker-env) && docker build -t openfga-operator:latest .; \
+	else \
+		echo "Minikube not using Docker driver, falling back to container-build + minikube-load"; \
+		$(MAKE) container-build minikube-load; \
+	fi
+	@echo "Verifying image is available in Minikube..."
+	@minikube image ls | grep openfga-operator || { echo "Error: Image not available in Minikube"; exit 1; }
+
 # Load container image into Minikube
 minikube-load:
 	@echo "Loading container image into Minikube..."
-	minikube image load openfga-operator:latest
+	@if command -v docker >/dev/null 2>&1 && minikube config get driver 2>/dev/null | grep -q docker; then \
+		echo "Using Minikube's Docker environment to verify image..."; \
+		eval $$(minikube docker-env) && docker images | grep openfga-operator || { \
+			echo "Image not found in Minikube's Docker environment, loading..."; \
+			minikube image load openfga-operator:latest; \
+		}; \
+	else \
+		echo "Loading image using minikube image load..."; \
+		minikube image load openfga-operator:latest; \
+	fi
+	@echo "Verifying image is available in Minikube..."
+	@minikube image ls | grep openfga-operator || { echo "Error: Image not available in Minikube"; exit 1; }
 
 # Deploy to Minikube (requires image to be built and loaded)
-minikube-deploy: container-build minikube-load install-crds
+minikube-deploy: minikube-build install-crds
 	@echo "Deploying to Minikube..."
 	kubectl create namespace openfga-system --dry-run=client -o yaml | kubectl apply -f -
 	kubectl apply -f - <<< 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: openfga-operator\n  namespace: openfga-system\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: openfga-operator\n  template:\n    metadata:\n      labels:\n        app: openfga-operator\n    spec:\n      containers:\n      - name: operator\n        image: openfga-operator:latest\n        imagePullPolicy: Never\n        ports:\n        - containerPort: 8080'
@@ -210,7 +234,9 @@ help:
 	@echo "  deploy-dev   - Deploy to development environment"
 	@echo "  deploy-staging - Deploy to staging environment"
 	@echo "  deploy-prod  - Deploy to production environment"
-	@echo "  deploy-base  - Deploy enterprise base configuration"
+	@echo "  minikube-build - Build container image using Minikube's Docker environment"
+	@echo "  minikube-load - Load container image into Minikube"
+	@echo "  minikube-deploy - Build and deploy to Minikube"
 	@echo "  verify-deployment - Verify deployment status"
 	@echo "  check-kustomize - Validate kustomize configurations"
 	@echo "  clean-dev    - Clean up development deployment"
