@@ -16,28 +16,21 @@ COPY . .
 # Build the application (dependencies are already cached)
 RUN cargo build --release --locked
 
-# Runtime stage  
-FROM cgr.dev/chainguard/wolfi-base:latest
-
-# Install CA certificates and other runtime dependencies
-RUN apk add --no-cache \
-    ca-certificates \
-    curl
-
-# Runtime stage - using distroless cc (includes glibc)
-FROM gcr.io/distroless/cc:latest
+# Runtime stage - using Chainguard glibc with dev tools for health checks
+FROM cgr.dev/chainguard/gcc-glibc:latest-dev
 
 # Copy binary from builder stage
 COPY --from=builder /app/target/release/openfga-operator /usr/local/bin/openfga-operator
 
-# Switch to non-root user (distroless already provides nonroot user with uid 65532)
+# Switch to non-root user (Chainguard provides nonroot user with uid 65532)
 USER 65532:65532
 
 # Expose metrics port
 EXPOSE 8080
 
-# Note: Health checks removed as distroless images don't have shell or external tools
-# Health monitoring should be implemented at the orchestration level (e.g., Kubernetes probes)
+# Health check using curl (available in -dev variant)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
 
 # Set entrypoint
 ENTRYPOINT ["/usr/local/bin/openfga-operator"]

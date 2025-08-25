@@ -1,5 +1,5 @@
 # Build stage
-FROM cgr.dev/chainguard/node:latest
+FROM cgr.dev/chainguard/node:latest AS builder
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ COPY models ./models
 RUN npm run build
 
 # Production dependencies stage
-FROM node:18-alpine AS deps
+FROM cgr.dev/chainguard/node:latest AS deps
 
 WORKDIR /app
 
@@ -28,8 +28,8 @@ COPY package*.json ./
 # Install only production dependencies
 RUN npm ci --omit=dev && npm cache clean --force
 
-# Runtime stage using distroless Node.js
-FROM gcr.io/distroless/nodejs18:latest
+# Runtime stage using Chainguard Node.js with dev tools for health checks
+FROM cgr.dev/chainguard/node:latest-dev
 
 WORKDIR /app
 
@@ -43,15 +43,17 @@ COPY --from=deps /app/node_modules ./node_modules
 # Copy package.json for metadata
 COPY package.json ./
 
-# Switch to non-root user (distroless already provides nonroot user with uid 65532)
+# Switch to non-root user (Chainguard provides nonroot user with uid 65532)
 USER 65532:65532
 
 # Expose port
 EXPOSE 3000
 
-# Note: Health checks removed as distroless images don't have shell or external tools
-# The original health check used Node.js built-in modules, but distroless doesn't support inline scripts
-# Health monitoring should be implemented at the orchestration level (e.g., Kubernetes probes)
+# Health check using Node.js built-in modules (supported in -dev variant)
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (res) => { \
+    process.exit(res.statusCode === 200 ? 0 : 1) \
+  }).on('error', () => process.exit(1))"
 
 # Start the application
 ENTRYPOINT ["node", "dist/app.js"]
