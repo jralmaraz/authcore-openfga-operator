@@ -121,6 +121,11 @@ container-build:
 		exit 1; \
 	fi
 
+# Test Podman build with permission fixes
+test-podman-build:
+	@echo "Testing Podman build with permission fixes..."
+	@./scripts/test-podman-build.sh
+
 # Legacy target for backward compatibility
 docker-build: container-build
 
@@ -200,6 +205,7 @@ help:
 	@echo "  run          - Run the operator locally"
 	@echo "  dev          - Run in development mode with auto-reload"
 	@echo "  container-build - Build container image (Docker or Podman)"
+	@echo "  test-podman-build - Test Podman build with permission fixes"
 	@echo "  docker-build - Build container image (legacy, uses container-build)"
 	@echo "  deploy-dev   - Deploy to development environment"
 	@echo "  deploy-staging - Deploy to staging environment"

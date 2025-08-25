@@ -12,21 +12,52 @@ USER 1000
 ENV HOME=/tmp/cargo-home
 RUN mkdir -p $HOME && chmod 755 $HOME
 
+# Set CARGO_HOME to ensure consistent cargo cache location
+ENV CARGO_HOME=$HOME/.cargo
+RUN mkdir -p $CARGO_HOME && chmod 755 $CARGO_HOME
+
 # Copy dependency files first for better layer caching
 COPY Cargo.toml Cargo.lock ./
 
+# Fix ownership of copied files (critical for Podman rootless builds)
+USER root
+RUN chown -R 1000:1000 /app/Cargo.toml /app/Cargo.lock
+USER 1000
+
 # Create dummy main.rs to build dependencies first
 RUN mkdir -p src && echo "fn main() {}" > src/main.rs
+
+# Ensure target directory exists with proper permissions before first build
+RUN mkdir -p /app/target && chmod 755 /app/target
+
+# Build dependencies (this creates .cargo-lock and other files)
 RUN cargo build --release --locked
+
+# Fix permissions for build artifacts after dependency build (critical for .cargo-lock)
+USER root
+RUN chown -R 1000:1000 /app/target /app/src
+USER 1000
+
 RUN rm src/main.rs
 
+# Copy source code
 COPY . .
+
+# Fix ownership of all copied source files (critical for Podman rootless builds)
+USER root
+RUN chown -R 1000:1000 /app
+USER 1000
 
 # Build the application (dependencies are already cached)
 RUN cargo build --release --locked
 
-# Ensure proper permissions for all build artifacts (fixes Podman permission issues)
-RUN chown -R 1000:1000 /app/target
+# Final permission fix for all build artifacts (ensures .cargo-lock access)
+USER root
+RUN chown -R 1000:1000 /app/target && \
+    chmod -R 755 /app/target && \
+    # Specifically handle .cargo-lock file permissions
+    find /app/target -name ".cargo-lock" -exec chown 1000:1000 {} \; -exec chmod 644 {} \;
+USER 1000
 
 # Runtime stage - using Chainguard glibc with dev tools for health checks
 FROM cgr.dev/chainguard/gcc-glibc:latest-dev
