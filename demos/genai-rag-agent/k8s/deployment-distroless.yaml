@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: genai-rag-agent
+  labels:
+    app: genai-rag-agent
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: genai-rag-agent
+  template:
+    metadata:
+      labels:
+        app: genai-rag-agent
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      containers:
+      - name: genai-rag-agent
+        image: genai-rag-agent:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        # Health checks using Kubernetes probes (replaces Docker HEALTHCHECK)
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+            scheme: HTTP
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 10
+          successThreshold: 1
+          failureThreshold: 3
+        resources:
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        env:
+        - name: PYTHONPATH
+          value: "/home/nonroot/.local/lib/python3.11/site-packages"
+        - name: PATH
+          value: "/home/nonroot/.local/bin:$PATH"
+        - name: OPENFGA_API_URL
+          value: "http://openfga-basic-http:8080"
+        # Add other environment variables as needed
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: app-tmp
+          mountPath: /app/tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: app-tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: genai-rag-agent
+  labels:
+    app: genai-rag-agent
+spec:
+  selector:
+    app: genai-rag-agent
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+  type: ClusterIP
