@@ -1,5 +1,5 @@
 # Build stage
-FROM rust:1.75 AS builder
+FROM cgr.dev/chainguard/rust:latest AS builder
 
 WORKDIR /app
 
@@ -9,14 +9,13 @@ COPY . .
 # Build the application
 RUN cargo build --release
 
-# Runtime stage
-FROM debian:bookworm-slim
+# Runtime stage  
+FROM cgr.dev/chainguard/wolfi-base:latest
 
 # Install CA certificates and other runtime dependencies
-RUN apt-get update && apt-get install -y \
+RUN apk add --no-cache \
     ca-certificates \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
+    curl
 
 # Create non-root user
 RUN groupadd -r openfga && useradd -r -g openfga openfga

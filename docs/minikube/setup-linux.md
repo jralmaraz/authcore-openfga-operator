@@ -196,7 +196,7 @@ Create a Dockerfile for building the operator container:
 ```bash
 cat > Dockerfile << 'EOF'
 # Build stage
-FROM rust:1.70 as builder
+FROM cgr.dev/chainguard/rust:latest as builder
 
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
@@ -206,12 +206,11 @@ COPY src/ ./src/
 RUN cargo build --release
 
 # Runtime stage
-FROM debian:bookworm-slim
+FROM cgr.dev/chainguard/wolfi-base:latest
 
 # Install CA certificates and other runtime dependencies
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache \
+    ca-certificates
 
 # Create non-root user
 RUN groupadd -r openfga && useradd -r -g openfga openfga
