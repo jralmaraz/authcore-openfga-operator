@@ -3,10 +3,14 @@ FROM cgr.dev/chainguard/rust:latest AS builder
 
 WORKDIR /app
 
-# Ensure proper permissions for the working directory
+# Ensure proper permissions for the working directory and set HOME for Cargo
 USER root
 RUN chown -R 1000:1000 /app
 USER 1000
+
+# Set HOME environment variable for Cargo (required for Podman builds)
+ENV HOME=/tmp/cargo-home
+RUN mkdir -p $HOME && chmod 755 $HOME
 
 # Copy dependency files first for better layer caching
 COPY Cargo.toml Cargo.lock ./

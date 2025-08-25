@@ -121,6 +121,8 @@ podman --version
 podman run hello-world
 ```
 
+**Note for Podman Users:** The Dockerfile has been updated to handle Cargo home directory issues that can occur with rootless Podman builds. If you encounter build issues, see the [Podman Compatibility Guide](../../PODMAN.md) for additional troubleshooting steps.
+
 ### Install kubectl
 
 ```bash
@@ -224,43 +226,19 @@ make test
 make build
 ```
 
-## Step 4: Create Dockerfile for the Operator
+## Step 4: Use the Operator Dockerfile
 
-Create a Dockerfile for building the operator container:
+The project includes a production-ready Dockerfile that handles all necessary build requirements including proper home directory setup for Cargo (essential for Podman compatibility).
 
+The Dockerfile is already present in the project root and includes:
+- Multi-stage build with Chainguard secure base images
+- Proper permission handling for rootless containers
+- Cargo home directory configuration for Podman compatibility
+- Optimized layer caching for dependencies
+
+You can inspect the Dockerfile:
 ```bash
-cat > Dockerfile << 'EOF'
-# Build stage
-FROM cgr.dev/chainguard/rust:latest as builder
-
-WORKDIR /app
-COPY Cargo.toml Cargo.lock ./
-COPY src/ ./src/
-
-# Build the application
-RUN cargo build --release
-
-# Runtime stage
-FROM cgr.dev/chainguard/wolfi-base:latest
-
-# Install CA certificates and other runtime dependencies
-RUN apk add --no-cache \
-    ca-certificates
-
-# Create non-root user
-RUN groupadd -r openfga && useradd -r -g openfga openfga
-
-# Copy binary from builder stage
-COPY --from=builder /app/target/release/openfga-operator /usr/local/bin/openfga-operator
-
-# Set ownership and permissions
-RUN chown openfga:openfga /usr/local/bin/openfga-operator
-USER openfga
-
-EXPOSE 8080
-
-CMD ["openfga-operator"]
-EOF
+cat Dockerfile
 ```
 
 ## Step 5: Deploy to Minikube
@@ -278,8 +256,12 @@ kubectl get crd openfgas.authorization.openfga.dev
 ### Build and Deploy the Operator
 
 ```bash
-# Build Docker image
-docker build -t openfga-operator:latest .
+# Build container image (automatically detects Docker/Podman)
+make container-build
+
+# Alternatively, specify container runtime explicitly:
+# CONTAINER_RUNTIME=docker make container-build
+# CONTAINER_RUNTIME=podman make container-build
 
 # Load image into Minikube
 minikube image load openfga-operator:latest
