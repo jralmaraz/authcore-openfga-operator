@@ -42,6 +42,7 @@ The OpenFGA Operator provides a Kubernetes-native way to deploy and manage OpenF
 - **[Product Log](docs/product-log/PRODUCT_LOG.md)**: Comprehensive product documentation
 - **[Security Policy](docs/security/SECURITY_POLICY.md)**: Security requirements and standards
 - **[Incident Response](docs/security/INCIDENT_RESPONSE.md)**: Security incident response procedures
+- **[Container Runtime Support](docs/CONTAINER_RUNTIME_SUPPORT.md)**: Docker and Podman runtime options
 
 ### 🌐 AuthCore Showcase
 - **[AuthCore Website](docs/authcore-website/)**: Professional showcase website with content management
