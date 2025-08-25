@@ -1,0 +1,97 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak-ingress
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak
+      app.kubernetes.io/component: identity-provider
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow traffic from ingress controllers
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow traffic from OpenFGA operator
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: openfga-operator
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow traffic from OpenFGA instances
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: openfga-workloads
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow internal Keycloak clustering
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: keycloak
+    ports:
+    - protocol: TCP
+      port: 7600
+    - protocol: TCP
+      port: 57600
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keycloak-egress
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: keycloak
+      app.kubernetes.io/component: identity-provider
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow database access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow HTTPS for external identity providers
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 443
+  # Allow internal Keycloak clustering
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: keycloak
+    ports:
+    - protocol: TCP
+      port: 7600
+    - protocol: TCP
+      port: 57600

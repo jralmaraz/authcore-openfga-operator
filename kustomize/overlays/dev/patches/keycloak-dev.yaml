@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: openfga-system
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: keycloak
+        env:
+        - name: KC_LOG_LEVEL
+          value: "DEBUG"
+        - name: KC_DEVELOPMENT_MODE
+          value: "true"
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi

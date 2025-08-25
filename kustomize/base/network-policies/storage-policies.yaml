@@ -1,0 +1,92 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: portworx-storage-ingress
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: portworx
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: portworx
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow Portworx control plane communication
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 9001
+    - protocol: TCP
+      port: 9002
+    - protocol: TCP
+      port: 9003
+    - protocol: TCP
+      port: 9010
+    - protocol: TCP
+      port: 9020
+    - protocol: TCP
+      port: 9021
+  # Allow storage operations from authorized pods
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: openfga-operator
+    ports:
+    - protocol: TCP
+      port: 9001
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: portworx-storage-egress
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: portworx
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: portworx
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow Kubernetes API access
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 6443
+  # Allow Portworx cluster communication
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: portworx
+    ports:
+    - protocol: TCP
+      port: 9001
+    - protocol: TCP
+      port: 9002
+    - protocol: TCP
+      port: 9003
+    - protocol: TCP
+      port: 9010
+    - protocol: TCP
+      port: 9020
+    - protocol: TCP
+      port: 9021

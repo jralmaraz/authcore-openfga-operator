@@ -1,5 +1,5 @@
 # Build stage
-FROM node:18-alpine AS builder
+FROM cgr.dev/chainguard/node:latest
 
 WORKDIR /app
 

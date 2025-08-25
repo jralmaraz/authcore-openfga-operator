@@ -1,0 +1,95 @@
+apiVersion: authorization.openfga.dev/v1alpha1
+kind: OpenFGA
+metadata:
+  name: enterprise-openfga
+  namespace: openfga-workloads
+  labels:
+    app.kubernetes.io/name: enterprise-openfga
+    app.kubernetes.io/component: authorization-service
+    app.kubernetes.io/part-of: openfga-operator
+    environment: production
+    tenant: enterprise
+spec:
+  replicas: 3
+  image: "openfga/openfga:v1.5.0"
+  datastore:
+    engine: "postgres"
+    uri: "postgresql://openfga-user:secure-password@postgresql:5432/openfga?sslmode=require"
+  playground:
+    enabled: false
+  grpc:
+    port: 8081
+  http:
+    port: 8080
+  # Enterprise features
+  auth:
+    method: "oidc"
+    oidc:
+      issuer: "https://keycloak.example.com/realms/openfga"
+      clientId: "openfga-operator"
+      clientSecret: "openfga-operator-secret"
+      audience: "openfga"
+  metrics:
+    enabled: true
+    port: 9090
+  tracing:
+    enabled: true
+    endpoint: "http://jaeger-collector:14268/api/traces"
+  logging:
+    level: "info"
+    format: "json"
+  security:
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 65532
+      runAsGroup: 65532
+      fsGroup: 65532
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      runAsUser: 65532
+      runAsGroup: 65532
+      capabilities:
+        drop:
+        - ALL
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  storage:
+    className: portworx-sc-db
+    size: 50Gi
+  nodeSelector:
+    workload-type: compute-intensive
+  tolerations:
+  - key: "workload-type"
+    operator: "Equal"
+    value: "compute-intensive"
+    effect: "NoSchedule"
+  affinity:
+    podAntiAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: enterprise-openfga
+        topologyKey: kubernetes.io/hostname
+  networkPolicy:
+    enabled: true
+    allowedSources:
+    - namespaceSelector:
+        matchLabels:
+          name: application-tier
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/component: frontend
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"
+    retention: "30d"
+    storageClass: portworx-sc-replicated

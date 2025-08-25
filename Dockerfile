@@ -1,5 +1,5 @@
 # Build stage
-FROM rust:1.89 AS builder
+FROM cgr.dev/chainguard/rust:latest AS builder
 
 WORKDIR /app
 
@@ -11,11 +11,18 @@ RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release --locked
 RUN rm src/main.rs
 
-# Copy the entire project
 COPY . .
 
 # Build the application (dependencies are already cached)
 RUN cargo build --release --locked
+
+# Runtime stage  
+FROM cgr.dev/chainguard/wolfi-base:latest
+
+# Install CA certificates and other runtime dependencies
+RUN apk add --no-cache \
+    ca-certificates \
+    curl
 
 # Runtime stage - using distroless cc (includes glibc)
 FROM gcr.io/distroless/cc:latest

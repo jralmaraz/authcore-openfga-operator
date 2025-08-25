@@ -1,0 +1,55 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionWebhook
+metadata:
+  name: openfga-security-mutator
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: admission-controller
+spec:
+  clientConfig:
+    service:
+      name: openfga-operator-webhook
+      namespace: openfga-system
+      path: /mutate
+  rules:
+  - operations: ["CREATE", "UPDATE"]
+    apiGroups: ["apps"]
+    apiVersions: ["v1"]
+    resources: ["deployments"]
+    namespaceSelector:
+      matchLabels:
+        app.kubernetes.io/part-of: openfga-operator
+  - operations: ["CREATE"]
+    apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]
+    namespaceSelector:
+      matchLabels:
+        app.kubernetes.io/part-of: openfga-operator
+  admissionReviewVersions: ["v1", "v1beta1"]
+  sideEffects: None
+  failurePolicy: Fail
+  timeoutSeconds: 10
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionWebhook
+metadata:
+  name: openfga-defaults-mutator
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: admission-controller
+spec:
+  clientConfig:
+    service:
+      name: openfga-operator-webhook
+      namespace: openfga-system
+      path: /mutate-defaults
+  rules:
+  - operations: ["CREATE"]
+    apiGroups: ["authorization.openfga.dev"]
+    apiVersions: ["v1alpha1"]
+    resources: ["openfgas"]
+  admissionReviewVersions: ["v1", "v1beta1"]
+  sideEffects: None
+  failurePolicy: Fail
+  timeoutSeconds: 10

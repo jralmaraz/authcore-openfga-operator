@@ -1,5 +1,5 @@
 # Build stage
-FROM python:3.11-slim AS builder
+FROM cgr.dev/chainguard/python:latest
 
 WORKDIR /app
 

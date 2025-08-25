@@ -1,0 +1,59 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: portworx-sc-db
+  labels:
+    app.kubernetes.io/name: portworx
+    app.kubernetes.io/component: storage
+provisioner: kubernetes.io/portworx-volume
+parameters:
+  repl: "3"
+  io_profile: "db_remote"
+  io_priority: "high"
+  snap_interval: "70"
+  aggregation_level: "1"
+  volume_type: "thin"
+  fs: "ext4"
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+reclaimPolicy: Delete
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: portworx-sc-replicated
+  labels:
+    app.kubernetes.io/name: portworx
+    app.kubernetes.io/component: storage
+provisioner: kubernetes.io/portworx-volume
+parameters:
+  repl: "2"
+  io_profile: "auto"
+  io_priority: "medium"
+  snap_interval: "240"
+  aggregation_level: "1"
+  volume_type: "thin"
+  fs: "ext4"
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+reclaimPolicy: Delete
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: portworx-sc-single
+  labels:
+    app.kubernetes.io/name: portworx
+    app.kubernetes.io/component: storage
+provisioner: kubernetes.io/portworx-volume
+parameters:
+  repl: "1"
+  io_profile: "auto"
+  io_priority: "medium"
+  snap_interval: "70"
+  aggregation_level: "1"
+  volume_type: "thin"
+  fs: "ext4"
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+reclaimPolicy: Delete
