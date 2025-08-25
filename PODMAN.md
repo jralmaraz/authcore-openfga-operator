@@ -62,6 +62,7 @@ The Dockerfile has been updated to handle permissions properly:
 - Explicit permission setting for the build directory
 - User switching to ensure proper ownership
 - **HOME environment variable set explicitly** for Cargo (fixes "Cargo couldn't find your home directory" error)
+- **Post-build permission fix** for target directory (fixes ".cargo-lock permission denied" error)
 - Graceful handling of directory creation
 
 ## Requirements
@@ -77,6 +78,12 @@ If you encounter "Cargo couldn't find your home directory" error:
 1. This has been fixed in the Dockerfile by explicitly setting `HOME=/tmp/cargo-home`
 2. The directory is created with proper permissions for the build user
 3. This fix ensures compatibility with rootless Podman builds
+
+### Cargo Lock File Permission Issues
+If you encounter "Permission denied (os error 13)" when accessing `/app/target/release/.cargo-lock`:
+1. This has been fixed in the Dockerfile by adding explicit permission setting after cargo build
+2. The command `RUN chown -R 1000:1000 /app/target` ensures build artifacts have correct ownership
+3. This specifically resolves rootless Podman issues with .cargo-lock file access
 
 ### Permission Denied Errors
 If you encounter permission errors:

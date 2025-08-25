@@ -25,6 +25,9 @@ COPY . .
 # Build the application (dependencies are already cached)
 RUN cargo build --release --locked
 
+# Ensure proper permissions for all build artifacts (fixes Podman permission issues)
+RUN chown -R 1000:1000 /app/target
+
 # Runtime stage - using Chainguard glibc with dev tools for health checks
 FROM cgr.dev/chainguard/gcc-glibc:latest-dev
 
