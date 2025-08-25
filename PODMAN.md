@@ -61,6 +61,7 @@ The container build process includes:
 The Dockerfile has been updated to handle permissions properly:
 - Explicit permission setting for the build directory
 - User switching to ensure proper ownership
+- **HOME environment variable set explicitly** for Cargo (fixes "Cargo couldn't find your home directory" error)
 - Graceful handling of directory creation
 
 ## Requirements
@@ -70,6 +71,12 @@ The Dockerfile has been updated to handle permissions properly:
 - For fallback: sudo access on the local machine
 
 ## Troubleshooting
+
+### Cargo Home Directory Issues
+If you encounter "Cargo couldn't find your home directory" error:
+1. This has been fixed in the Dockerfile by explicitly setting `HOME=/tmp/cargo-home`
+2. The directory is created with proper permissions for the build user
+3. This fix ensures compatibility with rootless Podman builds
 
 ### Permission Denied Errors
 If you encounter permission errors:
