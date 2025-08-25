@@ -1,13 +1,10 @@
 # Build stage
-FROM rust:1.70 as builder
+FROM rust:1.75 AS builder
 
 WORKDIR /app
 
-# Copy manifests
-COPY Cargo.toml Cargo.lock ./
-
-# Copy source code
-COPY src/ ./src/
+# Copy the entire project
+COPY . .
 
 # Build the application
 RUN cargo build --release
@@ -18,6 +15,7 @@ FROM debian:bookworm-slim
 # Install CA certificates and other runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
