@@ -58,12 +58,14 @@ The container build process includes:
 
 ### Dockerfile Changes
 
-The Dockerfile has been updated to handle permissions properly:
-- Explicit permission setting for the build directory
-- User switching to ensure proper ownership
+The Dockerfile has been comprehensively updated to handle permissions properly for rootless Podman builds:
+- **Multi-stage permission handling**: Ownership is fixed after each `COPY` operation since rootless Podman copies files with container-specific ownership
+- **Cargo cache directory setup**: `CARGO_HOME` environment variable and directory are created with proper permissions
+- **Target directory preparation**: Build target directory is created with proper permissions before any cargo operations
+- **Incremental permission fixes**: Permissions are fixed after dependency build when .cargo-lock is first created
 - **HOME environment variable set explicitly** for Cargo (fixes "Cargo couldn't find your home directory" error)
-- **Post-build permission fix** for target directory (fixes ".cargo-lock permission denied" error)
-- Graceful handling of directory creation
+- **Comprehensive final permission fix** including specific .cargo-lock file handling using find command
+- **Strategic user switching**: Uses `USER root` for permission operations, then switches back to `USER 1000` for security
 
 ## Requirements
 
@@ -81,15 +83,38 @@ If you encounter "Cargo couldn't find your home directory" error:
 
 ### Cargo Lock File Permission Issues
 If you encounter "Permission denied (os error 13)" when accessing `/app/target/release/.cargo-lock`:
-1. This has been fixed in the Dockerfile by adding explicit permission setting after cargo build
-2. The command `RUN chown -R 1000:1000 /app/target` ensures build artifacts have correct ownership
-3. This specifically resolves rootless Podman issues with .cargo-lock file access
+1. **Comprehensive fix implemented**: The Dockerfile now handles permissions at multiple critical stages:
+   - Sets proper ownership after each `COPY` operation (rootless Podman copies files with different ownership)
+   - Creates target directory with proper permissions before cargo operations
+   - Fixes permissions after dependency build (when .cargo-lock is first created)
+   - Applies final permission fix with specific .cargo-lock file handling
+2. **Multi-stage permission handling**: Uses `USER root` to fix ownership, then switches back to `USER 1000`
+3. **Specific .cargo-lock handling**: Uses `find` command to locate and fix permissions on .cargo-lock files specifically
+4. This comprehensive approach resolves all known rootless Podman permission issues with cargo build artifacts
 
 ### Permission Denied Errors
 If you encounter permission errors:
 1. The build will automatically retry with sudo
 2. Ensure your user has sudo privileges
 3. Check SELinux configuration if applicable
+
+### Debugging Permission Issues
+For troubleshooting remaining permission issues:
+1. **Enable verbose logging**: Add `--log-level=debug` to podman build command
+2. **Check file ownership in container**: 
+   ```bash
+   # Inspect intermediate container layers
+   podman build --layers -t openfga-operator:debug .
+   podman run --rm -it openfga-operator:debug ls -la /app/target/release/
+   ```
+3. **Verify user namespaces**: 
+   ```bash
+   podman unshare cat /proc/self/uid_map
+   ```
+4. **Alternative workaround**: If issues persist, you can force privileged build:
+   ```bash
+   sudo podman build --privileged -t openfga-operator:latest .
+   ```
 
 ### Network Issues
 If you encounter network connectivity issues:
@@ -108,6 +133,26 @@ On SELinux-enabled systems:
 2. **Configure rootless Podman properly** for security
 3. **Keep sudo access available** as fallback for Podman
 4. **Monitor build logs** for permission-related warnings
+5. **Test your builds** using the provided test script
+
+## Testing Podman Builds
+
+A comprehensive test script is provided to validate Podman builds:
+
+```bash
+# Test both rootless and sudo Podman builds
+make test-podman-build
+
+# Or run directly
+./scripts/test-podman-build.sh
+```
+
+The test script will:
+- Test rootless Podman build first
+- Fall back to sudo build if needed
+- Validate the built container image
+- Report which build methods work
+- Clean up test artifacts
 
 ## Related Documentation
 
