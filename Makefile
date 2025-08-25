@@ -181,13 +181,26 @@ minikube-build:
 	@echo "Building container image using Minikube's Docker environment..."
 	@if command -v docker >/dev/null 2>&1 && minikube config get driver 2>/dev/null | grep -q docker; then \
 		echo "Using Minikube's Docker environment"; \
-		eval $$(minikube docker-env) && docker build -t openfga-operator:latest .; \
+		eval $$(minikube docker-env) && docker build -t openfga-operator:latest . || { \
+			echo "Build failed in Minikube environment, falling back to local build"; \
+			$(MAKE) container-build minikube-load; \
+		}; \
 	else \
 		echo "Minikube not using Docker driver, falling back to container-build + minikube-load"; \
 		$(MAKE) container-build minikube-load; \
 	fi
 	@echo "Verifying image is available in Minikube..."
-	@minikube image ls | grep openfga-operator || { echo "Error: Image not available in Minikube"; exit 1; }
+	@for i in 1 2 3; do \
+		if minikube image ls | grep openfga-operator; then \
+			echo "✓ Image verified in Minikube"; \
+			exit 0; \
+		else \
+			echo "Image not found, attempt $$i/3..."; \
+			sleep 2; \
+		fi; \
+	done; \
+	echo "Error: Image not available in Minikube after 3 attempts"; \
+	exit 1
 
 # Load container image into Minikube
 minikube-load:
@@ -196,20 +209,75 @@ minikube-load:
 		echo "Using Minikube's Docker environment to verify image..."; \
 		eval $$(minikube docker-env) && docker images | grep openfga-operator || { \
 			echo "Image not found in Minikube's Docker environment, loading..."; \
-			minikube image load openfga-operator:latest; \
+			for i in 1 2 3; do \
+				if minikube image load openfga-operator:latest; then \
+					echo "✓ Image loaded successfully"; \
+					break; \
+				else \
+					echo "Load attempt $$i failed, retrying..."; \
+					sleep 2; \
+				fi; \
+			done; \
 		}; \
 	else \
 		echo "Loading image using minikube image load..."; \
-		minikube image load openfga-operator:latest; \
+		for i in 1 2 3; do \
+			if minikube image load openfga-operator:latest; then \
+				echo "✓ Image loaded successfully"; \
+				break; \
+			else \
+				echo "Load attempt $$i failed, retrying..."; \
+				sleep 2; \
+			fi; \
+		done; \
 	fi
 	@echo "Verifying image is available in Minikube..."
-	@minikube image ls | grep openfga-operator || { echo "Error: Image not available in Minikube"; exit 1; }
+	@for i in 1 2 3; do \
+		if minikube image ls | grep openfga-operator; then \
+			echo "✓ Image verified in Minikube"; \
+			exit 0; \
+		else \
+			echo "Verification attempt $$i/3 failed..."; \
+			sleep 2; \
+		fi; \
+	done; \
+	echo "Error: Image not available in Minikube after verification"; \
+	exit 1
 
 # Deploy to Minikube (requires image to be built and loaded)
 minikube-deploy: minikube-build install-crds
 	@echo "Deploying to Minikube..."
 	kubectl create namespace openfga-system --dry-run=client -o yaml | kubectl apply -f -
 	kubectl apply -f - <<< 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: openfga-operator\n  namespace: openfga-system\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: openfga-operator\n  template:\n    metadata:\n      labels:\n        app: openfga-operator\n    spec:\n      containers:\n      - name: operator\n        image: openfga-operator:latest\n        imagePullPolicy: Never\n        ports:\n        - containerPort: 8080'
+
+# Validate Minikube deployment
+minikube-validate:
+	@echo "Validating Minikube deployment..."
+	@echo "Checking Minikube status..."
+	@minikube status || { echo "Error: Minikube is not running"; exit 1; }
+	@echo "Checking if image is available..."
+	@minikube image ls | grep openfga-operator || { echo "Error: Image not found in Minikube"; exit 1; }
+	@echo "Checking operator deployment..."
+	@kubectl get deployment openfga-operator -n openfga-system || { echo "Error: Operator deployment not found"; exit 1; }
+	@echo "Checking operator pod status..."
+	@kubectl wait --for=condition=ready pod -l app=openfga-operator -n openfga-system --timeout=120s || { \
+		echo "Error: Operator pod not ready"; \
+		kubectl get pods -n openfga-system; \
+		kubectl logs -n openfga-system -l app=openfga-operator --tail=10; \
+		exit 1; \
+	}
+	@echo "Checking CRDs..."
+	@kubectl get crd openfgas.authorization.openfga.dev || { echo "Error: OpenFGA CRD not found"; exit 1; }
+	@echo "✓ All validation checks passed!"
+
+# Complete Minikube setup and deployment with validation
+minikube-setup-and-deploy: minikube-deploy minikube-validate
+	@echo "✓ Minikube deployment completed successfully!"
+	@echo ""
+	@echo "Next steps:"
+	@echo "1. Run './scripts/minikube/validate-deployment.sh' for additional validation"
+	@echo "2. Access OpenFGA API: kubectl port-forward service/openfga-basic-http 8080:8080"
+	@echo "3. Deploy demo applications: cd demos/banking-app && kubectl apply -f k8s/"
 
 # Run all quality checks
 check-all: fmt clippy compile test check-kustomize
