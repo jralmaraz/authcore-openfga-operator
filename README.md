@@ -167,6 +167,10 @@ The setup scripts can install either runtime based on your preference:
 
 See the [Minikube Setup Guide](docs/minikube/README.md) for detailed installation instructions.
 
+#### Podman Specific Configuration
+
+For detailed information about using Podman, including permission handling and troubleshooting, see the [Podman Compatibility Guide](PODMAN.md).
+
 ## Usage
 
 ### Basic Example
