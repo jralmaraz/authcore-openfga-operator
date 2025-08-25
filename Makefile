@@ -82,10 +82,22 @@ container-build:
 	@echo "Building container image..."
 	@if [ -n "$(CONTAINER_RUNTIME)" ]; then \
 		case "$(CONTAINER_RUNTIME)" in \
-			docker|podman) \
+			docker) \
 				if command -v $(CONTAINER_RUNTIME) >/dev/null 2>&1; then \
 					echo "Using container runtime: $(CONTAINER_RUNTIME)"; \
 					$(CONTAINER_RUNTIME) build -t openfga-operator:latest .; \
+				else \
+					echo "Error: Specified runtime '$(CONTAINER_RUNTIME)' not found" >&2; \
+					exit 1; \
+				fi ;; \
+			podman) \
+				if command -v $(CONTAINER_RUNTIME) >/dev/null 2>&1; then \
+					echo "Using container runtime: $(CONTAINER_RUNTIME)"; \
+					echo "Note: Podman may require sudo for proper permissions in some environments"; \
+					if ! $(CONTAINER_RUNTIME) build --security-opt label=disable -t openfga-operator:latest . 2>/dev/null; then \
+						echo "Rootless podman failed, trying with sudo..."; \
+						sudo $(CONTAINER_RUNTIME) build -t openfga-operator:latest .; \
+					fi; \
 				else \
 					echo "Error: Specified runtime '$(CONTAINER_RUNTIME)' not found" >&2; \
 					exit 1; \
@@ -99,7 +111,11 @@ container-build:
 		docker build -t openfga-operator:latest .; \
 	elif command -v podman >/dev/null 2>&1; then \
 		echo "Using container runtime: podman"; \
-		podman build -t openfga-operator:latest .; \
+		echo "Note: Podman may require sudo for proper permissions in some environments"; \
+		if ! podman build --security-opt label=disable -t openfga-operator:latest . 2>/dev/null; then \
+			echo "Rootless podman failed, trying with sudo..."; \
+			sudo podman build -t openfga-operator:latest .; \
+		fi; \
 	else \
 		echo "Error: No container runtime found. Please install Docker or Podman." >&2; \
 		exit 1; \

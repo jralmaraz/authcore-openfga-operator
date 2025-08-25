@@ -3,11 +3,16 @@ FROM cgr.dev/chainguard/rust:latest AS builder
 
 WORKDIR /app
 
+# Ensure proper permissions for the working directory
+USER root
+RUN chown -R 1000:1000 /app
+USER 1000
+
 # Copy dependency files first for better layer caching
 COPY Cargo.toml Cargo.lock ./
 
 # Create dummy main.rs to build dependencies first
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN mkdir -p src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release --locked
 RUN rm src/main.rs
 
