@@ -228,7 +228,6 @@ load_image_to_minikube() {
     done
 }
 
-# Build container image
 build_container_image() {
     local runtime
     runtime=$(get_container_runtime)
@@ -250,35 +249,22 @@ build_container_image() {
     if [ "$use_minikube_env" = "true" ]; then
         # Build directly in Minikube's environment
         log_info "Building image directly in Minikube's Docker daemon..."
-        if ! docker build -t "$OPERATOR_IMAGE" .; then
-            log_error "Failed to build image in Minikube's Docker environment"
-            log_error "Falling back to local build and load approach..."
-            use_minikube_env=false
-        fi
+        docker build -t openfga-operator:latest .
+        eval $(minikube docker-env -u)
+    else
+        log_info "Building image locally..."
+        docker build -t openfga-operator:latest .
+        log_info "Loading image into Minikube..."
+        for attempt in {1..3}; do
+            if minikube image load openfga-operator:latest; then
+                log_info "Image loaded successfully into Minikube"
+                break
+            else
+                log_warning "Failed to load image 'openfga-operator:latest', retrying in 5 seconds..."
+                sleep 5
+            fi
+        done
     fi
-    
-    if [ "$use_minikube_env" = "false" ]; then
-        # Build locally with detected runtime
-        log_info "Building image locally with $runtime..."
-        if ! $runtime build -t "$OPERATOR_IMAGE" .; then
-            log_error "Failed to build image with $runtime"
-            exit 1
-        fi
-        
-        # Load image into Minikube with retry mechanism
-        if ! load_image_to_minikube "$OPERATOR_IMAGE"; then
-            log_error "Failed to load image into Minikube"
-            exit 1
-        fi
-    fi
-    
-    # Verify the image is available with retry mechanism
-    if ! verify_image_in_minikube "$OPERATOR_IMAGE"; then
-        log_error "Failed to verify image availability in Minikube"
-        exit 1
-    fi
-    
-    log_success "Container image built and loaded into Minikube"
 }
 
 # Legacy function for backward compatibility
