@@ -58,6 +58,17 @@ docker-build:
 	@echo "Building Docker image..."
 	docker build -t openfga-operator:latest .
 
+# Load Docker image into Minikube
+minikube-load:
+	@echo "Loading Docker image into Minikube..."
+	minikube image load openfga-operator:latest
+
+# Deploy to Minikube (requires image to be built and loaded)
+minikube-deploy: docker-build minikube-load install-crds
+	@echo "Deploying to Minikube..."
+	kubectl create namespace openfga-system --dry-run=client -o yaml | kubectl apply -f -
+	kubectl apply -f - <<< 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: openfga-operator\n  namespace: openfga-system\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: openfga-operator\n  template:\n    metadata:\n      labels:\n        app: openfga-operator\n    spec:\n      containers:\n      - name: operator\n        image: openfga-operator:latest\n        imagePullPolicy: Never\n        ports:\n        - containerPort: 8080'
+
 # Run all quality checks
 check-all: fmt clippy compile test
 	@echo "All checks passed!"
@@ -65,16 +76,18 @@ check-all: fmt clippy compile test
 # Help target
 help:
 	@echo "Available targets:"
-	@echo "  compile      - Check syntax and dependencies"
-	@echo "  build        - Build the project in release mode"
-	@echo "  test         - Run tests"
-	@echo "  fmt          - Format code"
-	@echo "  clippy       - Run clippy linter"
-	@echo "  clean        - Clean build artifacts"
-	@echo "  install-crds - Install CRDs to Kubernetes cluster"
-	@echo "  uninstall-crds - Remove CRDs from Kubernetes cluster"
-	@echo "  run          - Run the operator locally"
-	@echo "  dev          - Run in development mode with auto-reload"
-	@echo "  docker-build - Build Docker image"
-	@echo "  check-all    - Run all quality checks"
-	@echo "  help         - Show this help message"
+	@echo "  compile         - Check syntax and dependencies"
+	@echo "  build           - Build the project in release mode"
+	@echo "  test            - Run tests"
+	@echo "  fmt             - Format code"
+	@echo "  clippy          - Run clippy linter"
+	@echo "  clean           - Clean build artifacts"
+	@echo "  install-crds    - Install CRDs to Kubernetes cluster"
+	@echo "  uninstall-crds  - Remove CRDs from Kubernetes cluster"
+	@echo "  run             - Run the operator locally"
+	@echo "  dev             - Run in development mode with auto-reload"
+	@echo "  docker-build    - Build Docker image"
+	@echo "  minikube-load   - Load Docker image into Minikube"
+	@echo "  minikube-deploy - Deploy to Minikube (build + load + deploy)"
+	@echo "  check-all       - Run all quality checks"
+	@echo "  help            - Show this help message"
