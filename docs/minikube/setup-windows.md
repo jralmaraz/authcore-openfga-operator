@@ -8,7 +8,8 @@ This guide provides step-by-step instructions for setting up and running the aut
 - Administrator privileges
 - At least 4GB of available RAM
 - At least 10GB of free disk space
-- Hyper-V or Docker Desktop support
+- Hyper-V support for virtualization
+- Container runtime: Docker Desktop or Podman Desktop
 
 ## Step 1: Install Required Tools
 
