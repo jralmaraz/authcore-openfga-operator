@@ -1,0 +1,14 @@
+# Simple test Dockerfile using pre-built binary
+FROM gcr.io/distroless/cc:latest
+
+# Copy pre-built binary
+COPY target/release/openfga-operator /usr/local/bin/openfga-operator
+
+# Switch to non-root user (distroless already provides nonroot user with uid 65532)
+USER 65532:65532
+
+# Expose metrics port
+EXPOSE 8080
+
+# Set entrypoint
+ENTRYPOINT ["/usr/local/bin/openfga-operator"]

@@ -1,41 +1,36 @@
 # Build stage
-FROM rust:1.75 AS builder
+FROM rust:1.89 AS builder
 
 WORKDIR /app
+
+# Copy dependency files first for better layer caching
+COPY Cargo.toml Cargo.lock ./
+
+# Create dummy main.rs to build dependencies first
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release --locked
+RUN rm src/main.rs
 
 # Copy the entire project
 COPY . .
 
-# Build the application
-RUN cargo build --release
+# Build the application (dependencies are already cached)
+RUN cargo build --release --locked
 
-# Runtime stage
-FROM debian:bookworm-slim
-
-# Install CA certificates and other runtime dependencies
-RUN apt-get update && apt-get install -y \
-    ca-certificates \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create non-root user
-RUN groupadd -r openfga && useradd -r -g openfga openfga
+# Runtime stage - using distroless cc (includes glibc)
+FROM gcr.io/distroless/cc:latest
 
 # Copy binary from builder stage
 COPY --from=builder /app/target/release/openfga-operator /usr/local/bin/openfga-operator
 
-# Set ownership and permissions
-RUN chown openfga:openfga /usr/local/bin/openfga-operator
-
-# Switch to non-root user
-USER openfga
+# Switch to non-root user (distroless already provides nonroot user with uid 65532)
+USER 65532:65532
 
 # Expose metrics port
 EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+# Note: Health checks removed as distroless images don't have shell or external tools
+# Health monitoring should be implemented at the orchestration level (e.g., Kubernetes probes)
 
 # Set entrypoint
-CMD ["openfga-operator"]
+ENTRYPOINT ["/usr/local/bin/openfga-operator"]
