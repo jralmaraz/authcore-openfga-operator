@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: openfga-system
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+      - name: keycloak
+        env:
+        - name: KC_LOG_LEVEL
+          value: "INFO"
+        - name: KC_PRODUCTION_MODE
+          value: "true"
+        - name: KC_CACHE
+          value: "ispn"
+        - name: KC_CACHE_STACK
+          value: "kubernetes"
+        resources:
+          requests:
+            cpu: 1000m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          capabilities:
+            drop:
+            - ALL

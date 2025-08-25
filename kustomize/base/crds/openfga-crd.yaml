@@ -1,0 +1,96 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: openfgas.authorization.openfga.dev
+spec:
+  group: authorization.openfga.dev
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              replicas:
+                type: integer
+                minimum: 1
+                default: 1
+              image:
+                type: string
+                default: "openfga/openfga:latest"
+              datastore:
+                type: object
+                properties:
+                  engine:
+                    type: string
+                    enum: ["memory", "postgres", "mysql"]
+                    default: "memory"
+                  uri:
+                    type: string
+                required:
+                - engine
+              playground:
+                type: object
+                properties:
+                  enabled:
+                    type: boolean
+                    default: false
+                  port:
+                    type: integer
+                    default: 3000
+              grpc:
+                type: object
+                properties:
+                  port:
+                    type: integer
+                    default: 8081
+              http:
+                type: object
+                properties:
+                  port:
+                    type: integer
+                    default: 8080
+            required:
+            - datastore
+          status:
+            type: object
+            properties:
+              replicas:
+                type: integer
+              readyReplicas:
+                type: integer
+              conditions:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    reason:
+                      type: string
+                    message:
+                      type: string
+                  required:
+                  - type
+                  - status
+    subresources:
+      status: {}
+      scale:
+        specReplicasPath: .spec.replicas
+        statusReplicasPath: .status.replicas
+  scope: Namespaced
+  names:
+    plural: openfgas
+    singular: openfga
+    kind: OpenFGA
+    shortNames:
+    - ofga

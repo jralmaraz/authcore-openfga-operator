@@ -1,0 +1,176 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: openfga-operator-ingress
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: openfga-operator
+      app.kubernetes.io/component: operator
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow webhook traffic from API server
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    - namespaceSelector:
+        matchLabels:
+          name: kube-apiserver
+    ports:
+    - protocol: TCP
+      port: 9443
+  # Allow metrics scraping from monitoring
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+    ports:
+    - protocol: TCP
+      port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: openfga-operator-egress
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: openfga-operator
+      app.kubernetes.io/component: operator
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow Kubernetes API access
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: kube-system
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 6443
+  # Allow access to OpenFGA instances
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          app.kubernetes.io/part-of: openfga-operator
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8081
+  # Allow access to Keycloak
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: keycloak
+    ports:
+    - protocol: TCP
+      port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: openfga-instances-ingress
+  namespace: openfga-workloads
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/managed-by: openfga-operator
+  policyTypes:
+  - Ingress
+  ingress:
+  # Allow traffic from operator
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: openfga-system
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: openfga-operator
+  # Allow traffic from ingress controllers
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8081
+  # Allow internal OpenFGA communication
+  - from:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/managed-by: openfga-operator
+    ports:
+    - protocol: TCP
+      port: 8080
+    - protocol: TCP
+      port: 8081
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: openfga-instances-egress
+  namespace: openfga-workloads
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: network-security
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/managed-by: openfga-operator
+  policyTypes:
+  - Egress
+  egress:
+  # Allow DNS
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+  # Allow database access
+  - to:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: postgresql
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow Keycloak access for OIDC
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: openfga-system
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: keycloak
+    ports:
+    - protocol: TCP
+      port: 8080

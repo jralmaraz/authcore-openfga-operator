@@ -1,0 +1,45 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: openfga-operator-webhook-certs
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: admission-controller
+spec:
+  secretName: openfga-operator-webhook-certs
+  issuerRef:
+    name: openfga-ca-issuer
+    kind: ClusterIssuer
+  commonName: openfga-operator-webhook.openfga-system.svc
+  dnsNames:
+  - openfga-operator-webhook
+  - openfga-operator-webhook.openfga-system
+  - openfga-operator-webhook.openfga-system.svc
+  - openfga-operator-webhook.openfga-system.svc.cluster.local
+  duration: 8760h # 1 year
+  renewBefore: 720h # 30 days
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: openfga-ca-issuer
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: admission-controller
+spec:
+  ca:
+    secretName: openfga-ca-secret
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openfga-ca-secret
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: admission-controller
+type: Opaque
+data:
+  tls.crt: LS0tLS1CRUdJTiBDRVJUSUZJQ0FURS0tLS0tCi0tLS0tRU5EIENFUlRJRklDQVRFLS0tLS0K
+  tls.key: LS0tLS1CRUdJTiBQUklWQVRFIEtFWS0tLS0tCi0tLS0tRU5EIFBSSVZBVEUgS0VZLS0tLS0K

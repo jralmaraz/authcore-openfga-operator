@@ -1,0 +1,72 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hubble-config
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: cilium-hubble
+    app.kubernetes.io/component: network-observability
+data:
+  config.yaml: |
+    hubble:
+      enabled: true
+      metrics:
+        enabled:
+          - dns
+          - drop
+          - tcp
+          - flow
+          - icmp
+          - http
+        port: 9965
+      relay:
+        enabled: true
+        rollOutPods: true
+      ui:
+        enabled: true
+        rollOutPods: true
+        ingress:
+          enabled: true
+          className: nginx
+          annotations:
+            nginx.ingress.kubernetes.io/ssl-redirect: "true"
+            cert-manager.io/cluster-issuer: "letsencrypt-prod"
+          hosts:
+            - hubble.example.com
+          tls:
+            - secretName: hubble-ui-tls
+              hosts:
+                - hubble.example.com
+      listenAddress: ":4244"
+      peerService:
+        clusterDomain: cluster.local
+      tls:
+        enabled: true
+        auto:
+          enabled: true
+          method: cronJob
+          schedule: "0 0 1 */4 *"
+          certValidityDuration: 1095
+        server:
+          cert: ""
+          key: ""
+        ca:
+          cert: ""
+          key: ""
+      redact:
+        enabled: false
+        http:
+          headers:
+            allow: []
+            deny: []
+          urlQuery: false
+          userInfo: true
+        kafka:
+          apiKey: false
+      skipUnknownCGroupIDs: true
+      skipUnknownCGroupIDs: true
+      export:
+        fileMaxSizeMb: 10
+        fileMaxBackups: 5
+    operator:
+      enabled: true

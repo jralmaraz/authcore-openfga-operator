@@ -1,0 +1,160 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hubble-relay
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: hubble-relay
+    app.kubernetes.io/component: network-observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hubble-relay
+      app.kubernetes.io/component: network-observability
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hubble-relay
+        app.kubernetes.io/component: network-observability
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+      serviceAccountName: hubble-relay
+      containers:
+      - name: hubble-relay
+        image: quay.io/cilium/hubble-relay:v1.14.5
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65532
+          runAsGroup: 65532
+          capabilities:
+            drop:
+            - ALL
+        command:
+        - hubble-relay
+        args:
+        - serve
+        - --listen-address=0.0.0.0:4245
+        - --peer-service=hubble-peer.kube-system.svc.cluster.local:443
+        - --peer-service-address=hubble-peer.kube-system.svc.cluster.local:443
+        - --dial-timeout=30s
+        - --retry-timeout=30s
+        - --sort-buffer-len-max=1000000
+        - --sort-buffer-drain-timeout=5s
+        - --disable-server-tls=false
+        - --disable-client-tls=false
+        - --tls-hubble-server-ca-files=/var/lib/hubble-relay/tls/hubble-server-ca.crt
+        - --tls-hubble-client-cert-file=/var/lib/hubble-relay/tls/client.crt
+        - --tls-hubble-client-key-file=/var/lib/hubble-relay/tls/client.key
+        - --tls-server-cert-file=/var/lib/hubble-relay/tls/server.crt
+        - --tls-server-key-file=/var/lib/hubble-relay/tls/server.key
+        ports:
+        - name: grpc
+          containerPort: 4245
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 1000m
+            memory: 1024Mi
+        livenessProbe:
+          grpc:
+            port: 4245
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          grpc:
+            port: 4245
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        volumeMounts:
+        - name: config
+          mountPath: /etc/hubble-relay
+          readOnly: true
+        - name: tls
+          mountPath: /var/lib/hubble-relay/tls
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: config
+        configMap:
+          name: hubble-relay-config
+      - name: tls
+        projected:
+          sources:
+          - secret:
+              name: hubble-relay-client-certs
+              items:
+              - key: tls.crt
+                path: client.crt
+              - key: tls.key
+                path: client.key
+              - key: ca.crt
+                path: hubble-server-ca.crt
+          - secret:
+              name: hubble-relay-server-certs
+              items:
+              - key: tls.crt
+                path: server.crt
+              - key: tls.key
+                path: server.key
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hubble-relay
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: hubble-relay
+    app.kubernetes.io/component: network-observability
+spec:
+  selector:
+    app.kubernetes.io/name: hubble-relay
+    app.kubernetes.io/component: network-observability
+  ports:
+  - name: grpc
+    port: 80
+    targetPort: grpc
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hubble-relay
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: hubble-relay
+    app.kubernetes.io/component: network-observability
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hubble-relay-config
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: hubble-relay
+    app.kubernetes.io/component: network-observability
+data:
+  config.yaml: |
+    server:
+      address: "0.0.0.0:4245"
+      tls:
+        enabled: true
+    peer-service: "hubble-peer.kube-system.svc.cluster.local:443"
+    dial-timeout: "30s"
+    retry-timeout: "30s"
+    sort-buffer-len-max: 1000000
+    sort-buffer-drain-timeout: "5s"

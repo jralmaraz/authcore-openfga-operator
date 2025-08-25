@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: openfga-operator
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: operator
+spec:
+  selector:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: operator
+  ports:
+  - name: metrics
+    port: 8080
+    targetPort: metrics
+    protocol: TCP
+  - name: webhook
+    port: 9443
+    targetPort: webhook
+    protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openfga-operator-webhook
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: webhook
+spec:
+  selector:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: operator
+  ports:
+  - name: webhook
+    port: 443
+    targetPort: webhook
+    protocol: TCP

@@ -1,0 +1,47 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: portworx-volume-policies
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: portworx
+    app.kubernetes.io/component: storage
+data:
+  backup-policy.yaml: |
+    apiVersion: stork.libopenstorage.org/v1alpha1
+    kind: SchedulePolicy
+    metadata:
+      name: openfga-daily-backup
+    policy:
+      daily:
+        time: "10:14PM"
+        retain: 30
+  disaster-recovery-policy.yaml: |
+    apiVersion: stork.libopenstorage.org/v1alpha1
+    kind: ClusterPair
+    metadata:
+      name: openfga-dr-cluster
+    spec:
+      config:
+        clusters:
+          openfga-dr:
+            certificate-authority-data: ""
+            server: "https://dr-cluster.example.com:6443"
+        contexts:
+          openfga-dr:
+            cluster: openfga-dr
+            user: openfga-dr
+        current-context: openfga-dr
+        users:
+          openfga-dr:
+            token: ""
+      options:
+        mode: DisasterRecovery
+  volume-snapshot-policy.yaml: |
+    apiVersion: volumesnapshot.external-storage.k8s.io/v1
+    kind: VolumeSnapshotClass
+    metadata:
+      name: portworx-snapshot-sc
+    snapshotter: pxd.portworx.com
+    parameters:
+      namespace: openfga-system

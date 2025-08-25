@@ -1,0 +1,70 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-config
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: keycloak
+    app.kubernetes.io/component: identity-provider
+data:
+  database-url: "jdbc:postgresql://postgresql:5432/keycloak"
+  realm-config.json: |
+    {
+      "realm": "openfga",
+      "enabled": true,
+      "displayName": "OpenFGA Authorization",
+      "displayNameHtml": "<strong>OpenFGA</strong> Authorization",
+      "loginTheme": "keycloak",
+      "adminTheme": "keycloak",
+      "accountTheme": "keycloak",
+      "emailTheme": "keycloak",
+      "sslRequired": "external",
+      "users": [],
+      "clients": [
+        {
+          "clientId": "openfga-operator",
+          "name": "OpenFGA Operator",
+          "enabled": true,
+          "clientAuthenticatorType": "client-secret",
+          "secret": "openfga-operator-secret",
+          "redirectUris": ["*"],
+          "webOrigins": ["*"],
+          "serviceAccountsEnabled": true,
+          "authorizationServicesEnabled": true,
+          "directAccessGrantsEnabled": true,
+          "standardFlowEnabled": true,
+          "implicitFlowEnabled": false,
+          "publicClient": false
+        }
+      ],
+      "roles": {
+        "realm": [
+          {
+            "name": "openfga-admin",
+            "description": "OpenFGA Administrator"
+          },
+          {
+            "name": "openfga-user",
+            "description": "OpenFGA User"
+          },
+          {
+            "name": "openfga-viewer",
+            "description": "OpenFGA Viewer"
+          }
+        ]
+      },
+      "defaultRoles": ["openfga-user"],
+      "requiredCredentials": ["password"],
+      "passwordPolicy": "hashIterations(27500) and length(8) and digits(2) and lowerCase(2) and upperCase(2) and specialChars(1) and notUsername",
+      "otpPolicyType": "totp",
+      "otpPolicyAlgorithm": "HmacSHA1",
+      "otpPolicyDigits": 6,
+      "otpPolicyLookAheadWindow": 1,
+      "otpPolicyPeriod": 30,
+      "browserFlow": "browser",
+      "registrationFlow": "registration",
+      "directGrantFlow": "direct grant",
+      "resetCredentialsFlow": "reset credentials",
+      "clientAuthenticationFlow": "clients",
+      "dockerAuthenticationFlow": "docker auth"
+    }

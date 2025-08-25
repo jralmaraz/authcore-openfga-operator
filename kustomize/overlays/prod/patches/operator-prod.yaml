@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openfga-operator
+  namespace: openfga-system
+spec:
+  replicas: 3
+  template:
+    spec:
+      containers:
+      - name: operator
+        env:
+        - name: RUST_LOG
+          value: "info"
+        - name: ENABLE_AUDIT_LOGGING
+          value: "true"
+        - name: ENABLE_PROMETHEUS_METRICS
+          value: "true"
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65532
+          runAsGroup: 65532
+          capabilities:
+            drop:
+            - ALL
