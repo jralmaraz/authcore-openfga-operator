@@ -49,14 +49,58 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Detect available container runtime
+detect_container_runtime() {
+    # Check environment variable first
+    if [ -n "${CONTAINER_RUNTIME:-}" ]; then
+        case "$CONTAINER_RUNTIME" in
+            docker|podman)
+                if command_exists "$CONTAINER_RUNTIME"; then
+                    echo "$CONTAINER_RUNTIME"
+                    return 0
+                else
+                    log_warning "Specified runtime '$CONTAINER_RUNTIME' not found, falling back to auto-detection"
+                fi
+                ;;
+            *)
+                log_warning "Invalid CONTAINER_RUNTIME '$CONTAINER_RUNTIME', falling back to auto-detection"
+                ;;
+        esac
+    fi
+    
+    # Auto-detect available runtime
+    if command_exists docker; then
+        echo "docker"
+    elif command_exists podman; then
+        echo "podman"
+    else
+        echo ""
+    fi
+}
+
+# Get container runtime or exit with error
+get_container_runtime() {
+    local runtime
+    runtime=$(detect_container_runtime)
+    
+    if [ -z "$runtime" ]; then
+        log_error "No container runtime found. Please install Docker or Podman."
+        exit 1
+    fi
+    
+    echo "$runtime"
+}
+
 # Check if Minikube is running
 is_minikube_running() {
     minikube status >/dev/null 2>&1
 }
 
-# Install Docker on Linux
-install_docker_linux() {
-    log_info "Installing Docker on Linux..."
+# Install container runtime on Linux
+install_container_runtime_linux() {
+    local runtime="${1:-docker}"
+    
+    log_info "Installing $runtime on Linux..."
     
     # Detect Linux distribution
     if [ -f /etc/os-release ]; then
@@ -67,7 +111,25 @@ install_docker_linux() {
         exit 1
     fi
 
-    case $DISTRO in
+    case $runtime in
+        docker)
+            install_docker_linux_impl "$DISTRO"
+            ;;
+        podman)
+            install_podman_linux_impl "$DISTRO"
+            ;;
+        *)
+            log_error "Unsupported container runtime: $runtime"
+            exit 1
+            ;;
+    esac
+}
+
+# Install Docker implementation
+install_docker_linux_impl() {
+    local distro=$1
+    
+    case $distro in
         ubuntu|debian)
             log_info "Installing Docker for Ubuntu/Debian..."
             sudo apt-get update
@@ -75,10 +137,10 @@ install_docker_linux() {
             
             # Add Docker's official GPG key
             sudo mkdir -p /etc/apt/keyrings
-            curl -fsSL https://download.docker.com/linux/$DISTRO/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+            curl -fsSL https://download.docker.com/linux/$distro/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
             
             # Add repository
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$DISTRO $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$distro $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
             
             # Install Docker
             sudo apt-get update
@@ -93,7 +155,7 @@ install_docker_linux() {
             fi
             ;;
         *)
-            log_error "Unsupported Linux distribution: $DISTRO"
+            log_error "Unsupported Linux distribution for Docker: $distro"
             exit 1
             ;;
     esac
@@ -105,6 +167,40 @@ install_docker_linux() {
     # Add user to docker group
     sudo usermod -aG docker $USER
     log_warning "You may need to log out and log back in for Docker group membership to take effect"
+}
+
+# Install Podman implementation
+install_podman_linux_impl() {
+    local distro=$1
+    
+    case $distro in
+        ubuntu|debian)
+            log_info "Installing Podman for Ubuntu/Debian..."
+            sudo apt-get update
+            sudo apt-get install -y podman
+            ;;
+        centos|rhel|fedora)
+            log_info "Installing Podman for CentOS/RHEL/Fedora..."
+            if command_exists dnf; then
+                sudo dnf install -y podman
+            else
+                sudo yum install -y podman
+            fi
+            ;;
+        *)
+            log_error "Unsupported Linux distribution for Podman: $distro"
+            exit 1
+            ;;
+    esac
+
+    # Enable and start podman socket for compatibility with Docker commands
+    systemctl --user enable --now podman.socket
+    log_success "Podman installed successfully"
+}
+
+# Legacy function for backward compatibility
+install_docker_linux() {
+    install_container_runtime_linux "docker"
 }
 
 # Install kubectl
@@ -179,13 +275,24 @@ check_prerequisites() {
     
     # Check for required tools
     local missing_tools=()
+    local runtime_available=false
     
-    if ! command_exists docker; then
+    # Check for container runtime
+    if command_exists docker || command_exists podman; then
+        runtime_available=true
+        local detected_runtime
+        detected_runtime=$(detect_container_runtime)
+        if [ -n "$detected_runtime" ]; then
+            log_info "Found container runtime: $detected_runtime"
+        fi
+    else
         if [ "$os" = "macos" ]; then
-            log_warning "Docker Desktop for Mac is required. Please install it from https://www.docker.com/products/docker-desktop"
-            missing_tools+=("docker")
+            log_warning "Docker Desktop or Podman for Mac is required."
+            log_warning "Docker: https://www.docker.com/products/docker-desktop"
+            log_warning "Podman: https://podman.io/docs/installation"
+            missing_tools+=("container-runtime")
         else
-            log_info "Docker will be installed automatically"
+            log_info "Container runtime (Docker or Podman) will be installed automatically"
         fi
     fi
     
@@ -223,12 +330,36 @@ start_minikube() {
         return
     fi
     
-    # Try Docker driver first
-    if minikube start --driver=docker --memory=4096 --cpus=2; then
-        log_success "Minikube started with Docker driver"
-    else
-        log_warning "Docker driver failed, trying alternative drivers..."
-        
+    # Detect container runtime for Minikube driver
+    local runtime
+    runtime=$(detect_container_runtime)
+    
+    local driver=""
+    case "$runtime" in
+        docker)
+            driver="docker"
+            ;;
+        podman)
+            driver="podman"
+            ;;
+        *)
+            log_warning "No container runtime detected, trying alternative drivers..."
+            ;;
+    esac
+    
+    # Try detected runtime driver first
+    if [ -n "$driver" ]; then
+        log_info "Starting Minikube with $driver driver..."
+        if minikube start --driver="$driver" --memory=4096 --cpus=2; then
+            log_success "Minikube started with $driver driver"
+        else
+            log_warning "$driver driver failed, trying alternative drivers..."
+            driver=""
+        fi
+    fi
+    
+    # Try fallback drivers if the detected runtime failed
+    if [ -z "$driver" ]; then
         # Try VirtualBox as fallback
         if command_exists VBoxManage; then
             log_info "Trying VirtualBox driver..."
@@ -251,11 +382,18 @@ start_minikube() {
 verify_installation() {
     log_info "Verifying installation..."
     
-    # Check Docker
-    if docker --version >/dev/null 2>&1; then
-        log_success "Docker is working"
+    # Check container runtime
+    local runtime
+    runtime=$(detect_container_runtime)
+    if [ -n "$runtime" ]; then
+        if $runtime --version >/dev/null 2>&1; then
+            log_success "$runtime is working"
+        else
+            log_error "$runtime is not working properly"
+            exit 1
+        fi
     else
-        log_error "Docker is not working properly"
+        log_error "No container runtime is working properly"
         exit 1
     fi
     
@@ -290,6 +428,37 @@ verify_installation() {
 
 # Main function
 main() {
+    # Parse command line arguments
+    local runtime_option=""
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --runtime)
+                runtime_option="$2"
+                shift 2
+                ;;
+            --help|-h)
+                echo "Usage: $0 [OPTIONS]"
+                echo "Options:"
+                echo "  --runtime RUNTIME    Specify container runtime (docker|podman)"
+                echo "  --help, -h          Show this help message"
+                echo ""
+                echo "Environment variables:"
+                echo "  CONTAINER_RUNTIME    Set container runtime preference (docker|podman)"
+                exit 0
+                ;;
+            *)
+                log_warning "Unknown option: $1"
+                shift
+                ;;
+        esac
+    done
+    
+    # Set runtime preference if specified
+    if [ -n "$runtime_option" ]; then
+        export CONTAINER_RUNTIME="$runtime_option"
+    fi
+    
     echo "=========================================="
     echo "  authcore-openfga-operator Minikube Setup"
     echo "=========================================="
@@ -307,9 +476,19 @@ main() {
     # Check prerequisites
     check_prerequisites "$OS"
     
-    # Install Docker (Linux only)
-    if [ "$OS" = "linux" ] && ! command_exists docker; then
-        install_docker_linux
+    # Install container runtime (Linux only)
+    if [ "$OS" = "linux" ]; then
+        local current_runtime
+        current_runtime=$(detect_container_runtime)
+        
+        if [ -z "$current_runtime" ]; then
+            # No runtime available, install preferred or default
+            local install_runtime="${CONTAINER_RUNTIME:-docker}"
+            log_info "Installing container runtime: $install_runtime"
+            install_container_runtime_linux "$install_runtime"
+        else
+            log_info "Using existing container runtime: $current_runtime"
+        fi
     fi
     
     # Install kubectl

@@ -35,9 +35,13 @@ sudo yum install -y curl wget
 sudo dnf install -y curl wget
 ```
 
-### Install Docker
+### Install Container Runtime
 
-#### For Ubuntu/Debian:
+You can choose between Docker (default) or Podman as your container runtime.
+
+#### Option A: Install Docker
+
+##### For Ubuntu/Debian:
 
 ```bash
 # Add Docker's official GPG key
@@ -79,11 +83,42 @@ sudo usermod -aG docker $USER
 newgrp docker
 ```
 
-### Verify Docker Installation
+#### Option B: Install Podman (Alternative to Docker)
+
+Podman provides a secure, rootless alternative to Docker.
+
+##### For Ubuntu/Debian:
 
 ```bash
+# Install Podman
+sudo apt install -y podman
+
+# Enable user session for rootless containers
+systemctl --user enable --now podman.socket
+```
+
+##### For CentOS/RHEL/Fedora:
+
+```bash
+# Install Podman
+sudo yum install -y podman
+# OR for newer versions
+sudo dnf install -y podman
+
+# Enable user session for rootless containers
+systemctl --user enable --now podman.socket
+```
+
+### Verify Container Runtime Installation
+
+```bash
+# For Docker
 docker --version
 docker run hello-world
+
+# For Podman
+podman --version
+podman run hello-world
 ```
 
 ### Install kubectl
@@ -575,14 +610,24 @@ minikube delete
 
 ## Automation
 
-For a fully automated setup, use the provided script:
+For a fully automated setup, use the provided scripts with container runtime selection:
 
 ```bash
 # Make scripts executable
 chmod +x scripts/minikube/*.sh
 
-# Run the automated setup script
+# Setup with Docker (default)
 ./scripts/minikube/setup-minikube.sh
 ./scripts/minikube/deploy-operator.sh
 ./scripts/minikube/validate-deployment.sh
+
+# Or setup with Podman
+./scripts/minikube/setup-minikube.sh --runtime podman
+CONTAINER_RUNTIME=podman ./scripts/minikube/deploy-operator.sh
+./scripts/minikube/validate-deployment.sh
 ```
+
+The scripts will automatically:
+- Install the specified container runtime if not present
+- Set up Minikube with the appropriate driver
+- Build and deploy the operator using your chosen runtime

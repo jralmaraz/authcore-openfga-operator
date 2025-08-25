@@ -23,6 +23,16 @@ Before starting, ensure you have:
 - At least 4GB of available RAM
 - At least 10GB of free disk space
 - Active internet connection for downloading dependencies
+- Container runtime (Docker or Podman) - can be installed by setup scripts
+
+### Container Runtime Support
+
+The setup scripts support both Docker and Podman as container runtimes:
+
+- **Docker**: The default option with broad compatibility and tooling support
+- **Podman**: Open-source alternative with enhanced security features (rootless execution)
+
+The scripts will automatically detect available runtimes or install your preferred choice during setup.
 
 ## Architecture Overview
 

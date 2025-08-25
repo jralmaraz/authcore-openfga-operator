@@ -53,10 +53,60 @@ dev:
 	@echo "Running in development mode..."
 	cargo watch -x run
 
-# Build Docker image
-docker-build:
-	@echo "Building Docker image..."
-	docker build -t openfga-operator:latest .
+# Detect container runtime
+detect-runtime:
+	@if [ -n "$(CONTAINER_RUNTIME)" ]; then \
+		case "$(CONTAINER_RUNTIME)" in \
+			docker|podman) \
+				if command -v $(CONTAINER_RUNTIME) >/dev/null 2>&1; then \
+					echo $(CONTAINER_RUNTIME); \
+				else \
+					echo "Error: Specified runtime '$(CONTAINER_RUNTIME)' not found" >&2; \
+					exit 1; \
+				fi ;; \
+			*) \
+				echo "Error: Invalid CONTAINER_RUNTIME '$(CONTAINER_RUNTIME)'" >&2; \
+				exit 1 ;; \
+		esac; \
+	elif command -v docker >/dev/null 2>&1; then \
+		echo docker; \
+	elif command -v podman >/dev/null 2>&1; then \
+		echo podman; \
+	else \
+		echo "Error: No container runtime found. Please install Docker or Podman." >&2; \
+		exit 1; \
+	fi
+
+# Build container image using detected runtime
+container-build:
+	@echo "Building container image..."
+	@if [ -n "$(CONTAINER_RUNTIME)" ]; then \
+		case "$(CONTAINER_RUNTIME)" in \
+			docker|podman) \
+				if command -v $(CONTAINER_RUNTIME) >/dev/null 2>&1; then \
+					echo "Using container runtime: $(CONTAINER_RUNTIME)"; \
+					$(CONTAINER_RUNTIME) build -t openfga-operator:latest .; \
+				else \
+					echo "Error: Specified runtime '$(CONTAINER_RUNTIME)' not found" >&2; \
+					exit 1; \
+				fi ;; \
+			*) \
+				echo "Error: Invalid CONTAINER_RUNTIME '$(CONTAINER_RUNTIME)'" >&2; \
+				exit 1 ;; \
+		esac; \
+	elif command -v docker >/dev/null 2>&1; then \
+		echo "Using container runtime: docker"; \
+		docker build -t openfga-operator:latest .; \
+	elif command -v podman >/dev/null 2>&1; then \
+		echo "Using container runtime: podman"; \
+		podman build -t openfga-operator:latest .; \
+	else \
+		echo "Error: No container runtime found. Please install Docker or Podman." >&2; \
+		exit 1; \
+	fi
+
+# Legacy target for backward compatibility
+docker-build: container-build
 
 # Deploy to development environment
 deploy-dev:
@@ -105,13 +155,13 @@ clean-prod:
 	@echo "Cleaning up production deployment..."
 	kubectl delete -k kustomize/overlays/prod/ --ignore-not-found=true
 
-# Load Docker image into Minikube
+# Load container image into Minikube
 minikube-load:
-	@echo "Loading Docker image into Minikube..."
+	@echo "Loading container image into Minikube..."
 	minikube image load openfga-operator:latest
 
 # Deploy to Minikube (requires image to be built and loaded)
-minikube-deploy: docker-build minikube-load install-crds
+minikube-deploy: container-build minikube-load install-crds
 	@echo "Deploying to Minikube..."
 	kubectl create namespace openfga-system --dry-run=client -o yaml | kubectl apply -f -
 	kubectl apply -f - <<< 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: openfga-operator\n  namespace: openfga-system\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: openfga-operator\n  template:\n    metadata:\n      labels:\n        app: openfga-operator\n    spec:\n      containers:\n      - name: operator\n        image: openfga-operator:latest\n        imagePullPolicy: Never\n        ports:\n        - containerPort: 8080'
@@ -133,7 +183,8 @@ help:
 	@echo "  uninstall-crds - Remove CRDs from Kubernetes cluster"
 	@echo "  run          - Run the operator locally"
 	@echo "  dev          - Run in development mode with auto-reload"
-	@echo "  docker-build - Build Docker image"
+	@echo "  container-build - Build container image (Docker or Podman)"
+	@echo "  docker-build - Build container image (legacy, uses container-build)"
 	@echo "  deploy-dev   - Deploy to development environment"
 	@echo "  deploy-staging - Deploy to staging environment"
 	@echo "  deploy-prod  - Deploy to production environment"
@@ -145,3 +196,6 @@ help:
 	@echo "  clean-prod   - Clean up production deployment"
 	@echo "  check-all    - Run all quality checks"
 	@echo "  help         - Show this help message"
+	@echo ""
+	@echo "Environment variables:"
+	@echo "  CONTAINER_RUNTIME - Set container runtime (docker|podman)"

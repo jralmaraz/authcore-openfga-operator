@@ -40,6 +40,48 @@ command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
+# Detect available container runtime
+detect_container_runtime() {
+    # Check environment variable first
+    if [ -n "${CONTAINER_RUNTIME:-}" ]; then
+        case "$CONTAINER_RUNTIME" in
+            docker|podman)
+                if command_exists "$CONTAINER_RUNTIME"; then
+                    echo "$CONTAINER_RUNTIME"
+                    return 0
+                else
+                    log_warning "Specified runtime '$CONTAINER_RUNTIME' not found, falling back to auto-detection"
+                fi
+                ;;
+            *)
+                log_warning "Invalid CONTAINER_RUNTIME '$CONTAINER_RUNTIME', falling back to auto-detection"
+                ;;
+        esac
+    fi
+    
+    # Auto-detect available runtime
+    if command_exists docker; then
+        echo "docker"
+    elif command_exists podman; then
+        echo "podman"
+    else
+        echo ""
+    fi
+}
+
+# Get container runtime or exit with error
+get_container_runtime() {
+    local runtime
+    runtime=$(detect_container_runtime)
+    
+    if [ -z "$runtime" ]; then
+        log_error "No container runtime found. Please install Docker or Podman."
+        exit 1
+    fi
+    
+    echo "$runtime"
+}
+
 # Check prerequisites
 check_prerequisites() {
     log_info "Checking prerequisites..."
@@ -54,9 +96,14 @@ check_prerequisites() {
         exit 1
     fi
     
-    if ! command_exists docker; then
-        log_error "docker is not installed. Please run setup-minikube.sh first."
+    # Check for any container runtime
+    local runtime
+    runtime=$(detect_container_runtime)
+    if [ -z "$runtime" ]; then
+        log_error "No container runtime (Docker or Podman) is installed. Please run setup-minikube.sh first."
         exit 1
+    else
+        log_info "Using container runtime: $runtime"
     fi
     
     if ! command_exists cargo; then
@@ -92,20 +139,28 @@ build_operator() {
     log_success "Operator build completed"
 }
 
-# Build Docker image
-build_docker_image() {
-    log_info "Building Docker image..."
+# Build container image
+build_container_image() {
+    local runtime
+    runtime=$(get_container_runtime)
+    
+    log_info "Building container image using $runtime..."
     
     cd "$PROJECT_ROOT"
     
-    # Build the Docker image
-    docker build -t "$OPERATOR_IMAGE" .
+    # Build the container image
+    $runtime build -t "$OPERATOR_IMAGE" .
     
     # Load image into Minikube
     log_info "Loading image into Minikube..."
     minikube image load "$OPERATOR_IMAGE"
     
-    log_success "Docker image built and loaded into Minikube"
+    log_success "Container image built and loaded into Minikube"
+}
+
+# Legacy function for backward compatibility
+build_docker_image() {
+    build_container_image
 }
 
 # Install CRDs
@@ -419,8 +474,8 @@ main() {
     # Build the operator
     build_operator
     
-    # Build Docker image
-    build_docker_image
+    # Build container image
+    build_container_image
     
     # Install CRDs
     install_crds

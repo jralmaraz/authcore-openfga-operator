@@ -58,6 +58,7 @@ The OpenFGA Operator provides a Kubernetes-native way to deploy and manage OpenF
 - Kubernetes cluster (v1.20+)
 - `kubectl` configured to access your cluster
 - Rust (1.70+) for development
+- Container runtime: Docker or Podman
 
 ## Installation
 
@@ -75,14 +76,22 @@ For local development and testing, use our comprehensive Minikube guides:
 For quick deployment, use our automation scripts:
 
 ```bash
-# Linux/macOS
+# Linux/macOS - Setup with Docker (default)
 ./scripts/minikube/setup-minikube.sh
 ./scripts/minikube/deploy-operator.sh
+
+# Linux/macOS - Setup with Podman
+./scripts/minikube/setup-minikube.sh --runtime podman
+CONTAINER_RUNTIME=podman ./scripts/minikube/deploy-operator.sh
 ./scripts/minikube/validate-deployment.sh
 
-# Windows PowerShell
+# Windows PowerShell - Setup with Docker (default)
 .\scripts\minikube\setup-minikube.ps1
 .\scripts\minikube\deploy-operator.ps1
+
+# Windows PowerShell - Setup with Podman
+.\scripts\minikube\setup-minikube.ps1 -Runtime podman
+$env:CONTAINER_RUNTIME="podman"; .\scripts\minikube\deploy-operator.ps1
 .\scripts\minikube\validate-deployment.ps1
 ```
 
@@ -100,12 +109,63 @@ make install-crds
 # Build the operator
 make build
 
-# Build Docker image
+# Build container image (auto-detects Docker or Podman)
+make container-build
+
+# Or specify runtime explicitly
+CONTAINER_RUNTIME=podman make container-build
+
+# Legacy Docker build command (still works)
 make docker-build
 
 # Deploy to your cluster (deployment manifests coming soon)
 kubectl apply -f k8s/
 ```
+
+### Container Runtime Support
+
+The OpenFGA Operator supports both Docker and Podman as container runtimes, providing flexibility to choose based on your preferences and licensing requirements.
+
+#### Automatic Runtime Detection
+
+The scripts and build system automatically detect available container runtimes:
+
+```bash
+# The system will automatically use Docker if available, otherwise Podman
+make container-build
+
+# Check which runtime will be used
+make detect-runtime
+```
+
+#### Runtime Selection
+
+You can explicitly specify which runtime to use:
+
+**Environment Variable:**
+```bash
+export CONTAINER_RUNTIME=podman
+make container-build
+./scripts/minikube/setup-minikube.sh
+```
+
+**Command Line Options:**
+```bash
+# Shell scripts
+./scripts/minikube/setup-minikube.sh --runtime podman
+
+# PowerShell scripts
+.\scripts\minikube\setup-minikube.ps1 -Runtime podman
+```
+
+#### Runtime Installation
+
+The setup scripts can install either runtime based on your preference:
+
+- **Docker**: The default option with comprehensive support across all platforms
+- **Podman**: Open-source alternative with rootless execution capabilities
+
+See the [Minikube Setup Guide](docs/minikube/README.md) for detailed installation instructions.
 
 ## Usage
 
