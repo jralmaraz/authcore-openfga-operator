@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: admission-controller-config
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: admission-controller
+data:
+  config.yaml: |
+    admission:
+      validation:
+        enabled: true
+        strictMode: true
+        policies:
+          securityContext:
+            enforceNonRoot: true
+            enforceReadOnlyRootFilesystem: true
+            disallowPrivilegeEscalation: true
+            requiredCapabilitiesDrop: ["ALL"]
+          imagePolicy:
+            allowedRegistries:
+              - "openfga/openfga"
+              - "ghcr.io/openfga/openfga"
+              - "quay.io/keycloak/keycloak"
+              - "portworx/oci-monitor"
+            requireImageSigning: true
+            requireScanResults: true
+            maxSeverity: "HIGH"
+          resourceLimits:
+            enforceResourceLimits: true
+            defaultCpuRequest: "100m"
+            defaultMemoryRequest: "128Mi"
+            defaultCpuLimit: "500m"
+            defaultMemoryLimit: "512Mi"
+          networkPolicies:
+            requireNetworkPolicies: true
+            denyAllByDefault: true
+      mutation:
+        enabled: true
+        defaults:
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            fsGroup: 65532
+            seccompProfile:
+              type: RuntimeDefault
+          containerSecurityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          labels:
+            "app.kubernetes.io/managed-by": "openfga-operator"
+            "security.openfga.dev/scanned": "true"

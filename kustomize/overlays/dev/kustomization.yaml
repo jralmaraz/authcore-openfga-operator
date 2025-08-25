@@ -1,0 +1,54 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: openfga-operator-dev
+
+resources:
+  - ../../base
+
+namePrefix: dev-
+
+labels:
+  - pairs:
+      environment: development
+      deployment.type: dev
+
+patches:
+  - path: patches/operator-dev.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: openfga-operator
+  - path: patches/keycloak-dev.yaml
+    target:
+      group: apps
+      version: v1
+      kind: Deployment
+      name: keycloak
+
+configMapGenerator:
+  - name: environment-config
+    literals:
+      - environment=development
+      - log-level=debug
+      - enable-playground=true
+
+secretGenerator:
+  - name: dev-secrets
+    literals:
+      - admin-password=dev-password-123
+      - db-password=dev-db-password
+
+images:
+  - name: openfga/openfga
+    newTag: v1.5.0
+  - name: openfga-operator
+    newTag: dev-latest
+
+replicas:
+  - name: openfga-operator
+    count: 1
+  - name: keycloak
+    count: 1
