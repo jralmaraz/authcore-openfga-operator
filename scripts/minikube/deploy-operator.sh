@@ -139,6 +139,50 @@ build_operator() {
     log_success "Operator build completed"
 }
 
+# Configure Minikube docker environment
+configure_minikube_env() {
+    log_info "Configuring Minikube docker environment..."
+    
+    # Check if Minikube is running
+    if ! minikube status >/dev/null 2>&1; then
+        log_error "Minikube is not running"
+        return 1
+    fi
+    
+    # Get Minikube's container runtime
+    local minikube_runtime
+    minikube_runtime=$(minikube config get driver 2>/dev/null || echo "docker")
+    
+    # Configure environment to use Minikube's docker daemon
+    if command_exists docker && [ "$minikube_runtime" = "docker" ]; then
+        log_info "Using Minikube's Docker environment"
+        eval $(minikube docker-env)
+        return 0
+    elif command_exists podman; then
+        log_info "Using Minikube with Podman runtime"
+        # For Podman, we still need to use image load approach
+        return 1
+    else
+        log_warning "Unable to configure Minikube environment, falling back to image load"
+        return 1
+    fi
+}
+
+# Verify image is available in Minikube
+verify_image_in_minikube() {
+    local image="$1"
+    log_info "Verifying image '$image' is available in Minikube..."
+    
+    # Check if image exists in Minikube
+    if minikube image ls | grep -q "$(echo "$image" | cut -d: -f1)"; then
+        log_success "Image '$image' is available in Minikube"
+        return 0
+    else
+        log_error "Image '$image' is not available in Minikube"
+        return 1
+    fi
+}
+
 # Build container image
 build_container_image() {
     local runtime
@@ -148,12 +192,36 @@ build_container_image() {
     
     cd "$PROJECT_ROOT"
     
-    # Build the container image
-    $runtime build -t "$OPERATOR_IMAGE" .
+    # Try to configure Minikube's docker environment first
+    local use_minikube_env=false
+    if configure_minikube_env; then
+        use_minikube_env=true
+        log_info "Building image directly in Minikube's Docker environment"
+    else
+        log_info "Building image locally and will load into Minikube"
+    fi
     
-    # Load image into Minikube
-    log_info "Loading image into Minikube..."
-    minikube image load "$OPERATOR_IMAGE"
+    # Build the container image
+    if [ "$use_minikube_env" = "true" ]; then
+        # Build directly in Minikube's environment
+        docker build -t "$OPERATOR_IMAGE" .
+    else
+        # Build locally with detected runtime
+        $runtime build -t "$OPERATOR_IMAGE" .
+        
+        # Load image into Minikube
+        log_info "Loading image into Minikube..."
+        if ! minikube image load "$OPERATOR_IMAGE"; then
+            log_error "Failed to load image into Minikube"
+            exit 1
+        fi
+    fi
+    
+    # Verify the image is available
+    if ! verify_image_in_minikube "$OPERATOR_IMAGE"; then
+        log_error "Failed to verify image availability in Minikube"
+        exit 1
+    fi
     
     log_success "Container image built and loaded into Minikube"
 }

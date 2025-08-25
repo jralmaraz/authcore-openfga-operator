@@ -142,6 +142,65 @@ function Build-Operator {
     Write-Success "Operator build completed"
 }
 
+# Configure Minikube docker environment
+function Set-MinikubeEnv {
+    Write-Info "Configuring Minikube docker environment..."
+    
+    # Check if Minikube is running
+    try {
+        minikube status | Out-Null
+    }
+    catch {
+        Write-Error-Custom "Minikube is not running"
+        return $false
+    }
+    
+    # Check if Minikube is using Docker driver
+    try {
+        $driver = minikube config get driver 2>$null
+        if ($driver -eq "docker" -and (Get-Command docker -ErrorAction SilentlyContinue)) {
+            Write-Info "Using Minikube's Docker environment"
+            # Set environment variables for Minikube's Docker
+            $env = minikube docker-env --shell=powershell | Out-String
+            if ($env) {
+                Invoke-Expression $env
+                return $true
+            }
+        }
+    }
+    catch {
+        Write-Warning "Unable to configure Minikube environment, falling back to image load"
+    }
+    
+    return $false
+}
+
+# Verify image is available in Minikube
+function Test-ImageInMinikube {
+    param(
+        [string]$ImageName
+    )
+    
+    Write-Info "Verifying image '$ImageName' is available in Minikube..."
+    
+    try {
+        $images = minikube image ls
+        $imageName = $ImageName.Split(':')[0]
+        if ($images -match $imageName) {
+            Write-Success "Image '$ImageName' is available in Minikube"
+            return $true
+        }
+        else {
+            Write-Error-Custom "Image '$ImageName' is not available in Minikube"
+            return $false
+        }
+    }
+    catch {
+        Write-Error-Custom "Failed to check image availability in Minikube"
+        return $false
+    }
+}
+
 # Build container image
 function Build-ContainerImage {
     $runtime = Get-ContainerRuntime
@@ -154,12 +213,46 @@ function Build-ContainerImage {
     
     Set-Location $ProjectRoot
     
-    # Build the container image
-    & $runtime build -t $OperatorImage .
+    # Try to configure Minikube's docker environment first
+    $useMinikubeEnv = $false
+    if ($runtime -eq "docker") {
+        $useMinikubeEnv = Set-MinikubeEnv
+        if ($useMinikubeEnv) {
+            Write-Info "Building image directly in Minikube's Docker environment"
+        }
+        else {
+            Write-Info "Building image locally and will load into Minikube"
+        }
+    }
+    else {
+        Write-Info "Using $runtime - will build locally and load into Minikube"
+    }
     
-    # Load image into Minikube
-    Write-Info "Loading image into Minikube..."
-    minikube image load $OperatorImage
+    # Build the container image
+    if ($useMinikubeEnv -and $runtime -eq "docker") {
+        # Build directly in Minikube's environment
+        docker build -t $OperatorImage .
+    }
+    else {
+        # Build locally with detected runtime
+        & $runtime build -t $OperatorImage .
+        
+        # Load image into Minikube
+        Write-Info "Loading image into Minikube..."
+        try {
+            minikube image load $OperatorImage
+        }
+        catch {
+            Write-Error-Custom "Failed to load image into Minikube"
+            throw
+        }
+    }
+    
+    # Verify the image is available
+    if (-not (Test-ImageInMinikube $OperatorImage)) {
+        Write-Error-Custom "Failed to verify image availability in Minikube"
+        throw "Image verification failed"
+    }
     
     Write-Success "Container image built and loaded into Minikube"
 }
