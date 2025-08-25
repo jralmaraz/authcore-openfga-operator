@@ -61,17 +61,47 @@ The OpenFGA Operator provides a Kubernetes-native way to deploy and manage OpenF
 
 ## Installation
 
-### Install CRDs
+### Quick Start with Minikube
+
+For local development and testing, use our comprehensive Minikube guides:
+
+- **[Minikube Setup Guide](docs/minikube/README.md)** - Complete setup instructions
+- **[MacOS Guide](docs/minikube/setup-macos.md)** - Step-by-step setup for macOS
+- **[Linux Guide](docs/minikube/setup-linux.md)** - Step-by-step setup for Linux
+- **[Windows Guide](docs/minikube/setup-windows.md)** - Step-by-step setup for Windows
+
+#### Automated Setup Scripts
+
+For quick deployment, use our automation scripts:
+
+```bash
+# Linux/macOS
+./scripts/minikube/setup-minikube.sh
+./scripts/minikube/deploy-operator.sh
+./scripts/minikube/validate-deployment.sh
+
+# Windows PowerShell
+.\scripts\minikube\setup-minikube.ps1
+.\scripts\minikube\deploy-operator.ps1
+.\scripts\minikube\validate-deployment.ps1
+```
+
+### Production Installation
+
+#### Install CRDs
 
 ```bash
 make install-crds
 ```
 
-### Deploy the Operator
+#### Deploy the Operator
 
 ```bash
 # Build the operator
 make build
+
+# Build Docker image
+make docker-build
 
 # Deploy to your cluster (deployment manifests coming soon)
 kubectl apply -f k8s/

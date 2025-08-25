@@ -105,6 +105,17 @@ clean-prod:
 	@echo "Cleaning up production deployment..."
 	kubectl delete -k kustomize/overlays/prod/ --ignore-not-found=true
 
+# Load Docker image into Minikube
+minikube-load:
+	@echo "Loading Docker image into Minikube..."
+	minikube image load openfga-operator:latest
+
+# Deploy to Minikube (requires image to be built and loaded)
+minikube-deploy: docker-build minikube-load install-crds
+	@echo "Deploying to Minikube..."
+	kubectl create namespace openfga-system --dry-run=client -o yaml | kubectl apply -f -
+	kubectl apply -f - <<< 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: openfga-operator\n  namespace: openfga-system\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: openfga-operator\n  template:\n    metadata:\n      labels:\n        app: openfga-operator\n    spec:\n      containers:\n      - name: operator\n        image: openfga-operator:latest\n        imagePullPolicy: Never\n        ports:\n        - containerPort: 8080'
+
 # Run all quality checks
 check-all: fmt clippy compile test check-kustomize
 	@echo "All checks passed!"
