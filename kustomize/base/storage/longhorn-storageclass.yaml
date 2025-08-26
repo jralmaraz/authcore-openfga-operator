@@ -1,0 +1,77 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn-sc-db
+  labels:
+    app.kubernetes.io/name: longhorn
+    app.kubernetes.io/component: storage
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+reclaimPolicy: Delete
+parameters:
+  numberOfReplicas: "3"
+  staleReplicaTimeout: "2880"
+  fromBackup: ""
+  fsType: "ext4"
+  dataLocality: "disabled"
+  replicaAutoBalance: "ignored"
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn-sc-replicated
+  labels:
+    app.kubernetes.io/name: longhorn
+    app.kubernetes.io/component: storage
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+reclaimPolicy: Delete
+parameters:
+  numberOfReplicas: "2"
+  staleReplicaTimeout: "2880"
+  fromBackup: ""
+  fsType: "ext4"
+  dataLocality: "disabled"
+  replicaAutoBalance: "ignored"
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn-sc-single
+  labels:
+    app.kubernetes.io/name: longhorn
+    app.kubernetes.io/component: storage
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+reclaimPolicy: Delete
+parameters:
+  numberOfReplicas: "1"
+  staleReplicaTimeout: "2880"
+  fromBackup: ""
+  fsType: "ext4"
+  dataLocality: "disabled"
+  replicaAutoBalance: "ignored"
+---
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: longhorn-sc-fast
+  labels:
+    app.kubernetes.io/name: longhorn
+    app.kubernetes.io/component: storage
+provisioner: driver.longhorn.io
+allowVolumeExpansion: true
+volumeBindingMode: Immediate
+reclaimPolicy: Delete
+parameters:
+  numberOfReplicas: "2"
+  staleReplicaTimeout: "2880"
+  fromBackup: ""
+  fsType: "ext4"
+  dataLocality: "best-effort"
+  replicaAutoBalance: "least-effort"
+  diskSelector: "ssd,nvme"
+  nodeSelector: "storage,fast"

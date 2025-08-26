@@ -1,0 +1,461 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: genai-authorization-model
+  namespace: openfga-workloads
+  labels:
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/component: authorization-model
+    domain: genai
+data:
+  model.json: |
+    {
+      "schema_version": "1.1",
+      "type_definitions": [
+        {
+          "type": "user",
+          "relations": {},
+          "metadata": {
+            "relations": {}
+          }
+        },
+        {
+          "type": "organization",
+          "relations": {
+            "admin": {
+              "this": {}
+            },
+            "member": {
+              "this": {}
+            }
+          },
+          "metadata": {
+            "relations": {
+              "admin": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "member": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "knowledge_base",
+          "relations": {
+            "owner": {
+              "this": {}
+            },
+            "curator": {
+              "this": {}
+            },
+            "contributor": {
+              "this": {}
+            },
+            "reader": {
+              "this": {}
+            },
+            "viewer": {
+              "union": {
+                "child": [
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "owner"
+                    }
+                  },
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "curator"
+                    }
+                  },
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "contributor"
+                    }
+                  },
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "reader"
+                    }
+                  },
+                  {
+                    "tupleToUserset": {
+                      "tupleset": {
+                        "object": "",
+                        "relation": "organization"
+                      },
+                      "computedUserset": {
+                        "object": "",
+                        "relation": "member"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "editor": {
+              "union": {
+                "child": [
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "owner"
+                    }
+                  },
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "curator"
+                    }
+                  },
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "contributor"
+                    }
+                  }
+                ]
+              }
+            },
+            "deleter": {
+              "union": {
+                "child": [
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "owner"
+                    }
+                  },
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "curator"
+                    }
+                  }
+                ]
+              }
+            },
+            "organization": {
+              "this": {}
+            }
+          },
+          "metadata": {
+            "relations": {
+              "owner": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "curator": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "contributor": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "reader": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "organization": {
+                "directly_related_user_types": [
+                  {
+                    "type": "organization"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "document",
+          "relations": {
+            "owner": {
+              "this": {}
+            },
+            "editor": {
+              "union": {
+                "child": [
+                  {
+                    "this": {}
+                  },
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "owner"
+                    }
+                  },
+                  {
+                    "tupleToUserset": {
+                      "tupleset": {
+                        "object": "",
+                        "relation": "knowledge_base"
+                      },
+                      "computedUserset": {
+                        "object": "",
+                        "relation": "editor"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "viewer": {
+              "union": {
+                "child": [
+                  {
+                    "this": {}
+                  },
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "owner"
+                    }
+                  },
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "editor"
+                    }
+                  },
+                  {
+                    "tupleToUserset": {
+                      "tupleset": {
+                        "object": "",
+                        "relation": "knowledge_base"
+                      },
+                      "computedUserset": {
+                        "object": "",
+                        "relation": "viewer"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "knowledge_base": {
+              "this": {}
+            },
+            "confidential": {
+              "this": {}
+            }
+          },
+          "metadata": {
+            "relations": {
+              "owner": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "editor": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "viewer": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "knowledge_base": {
+                "directly_related_user_types": [
+                  {
+                    "type": "knowledge_base"
+                  }
+                ]
+              },
+              "confidential": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "model",
+          "relations": {
+            "operator": {
+              "this": {}
+            },
+            "user": {
+              "this": {}
+            },
+            "configurator": {
+              "computedUserset": {
+                "object": "",
+                "relation": "operator"
+              }
+            }
+          },
+          "metadata": {
+            "relations": {
+              "operator": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "user": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "query_session",
+          "relations": {
+            "owner": {
+              "this": {}
+            },
+            "participant": {
+              "this": {}
+            },
+            "viewer": {
+              "union": {
+                "child": [
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "owner"
+                    }
+                  },
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "participant"
+                    }
+                  }
+                ]
+              }
+            },
+            "querier": {
+              "union": {
+                "child": [
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "owner"
+                    }
+                  },
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "participant"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "metadata": {
+            "relations": {
+              "owner": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "participant": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "query",
+          "relations": {
+            "initiator": {
+              "this": {}
+            },
+            "viewer": {
+              "union": {
+                "child": [
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "initiator"
+                    }
+                  },
+                  {
+                    "tupleToUserset": {
+                      "tupleset": {
+                        "object": "",
+                        "relation": "session"
+                      },
+                      "computedUserset": {
+                        "object": "",
+                        "relation": "viewer"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "session": {
+              "this": {}
+            }
+          },
+          "metadata": {
+            "relations": {
+              "initiator": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "session": {
+                "directly_related_user_types": [
+                  {
+                    "type": "query_session"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }

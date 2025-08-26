@@ -4,3 +4,7 @@ kind: Kustomization
 resources:
   - storageclass.yaml
   - volume-policies.yaml
+  - longhorn-storageclass.yaml
+  - longhorn-policies.yaml
+  - postgresql-persistent.yaml
+  - mysql-persistent.yaml

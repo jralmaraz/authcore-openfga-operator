@@ -1,0 +1,335 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: banking-authorization-model
+  namespace: openfga-workloads
+  labels:
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/component: authorization-model
+    domain: banking
+data:
+  model.json: |
+    {
+      "schema_version": "1.1",
+      "type_definitions": [
+        {
+          "type": "user",
+          "relations": {},
+          "metadata": {
+            "relations": {}
+          }
+        },
+        {
+          "type": "bank",
+          "relations": {
+            "employee": {
+              "this": {}
+            },
+            "manager": {
+              "this": {}
+            },
+            "customer": {
+              "this": {}
+            }
+          },
+          "metadata": {
+            "relations": {
+              "employee": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "manager": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "customer": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "account",
+          "relations": {
+            "owner": {
+              "this": {}
+            },
+            "co_owner": {
+              "this": {}
+            },
+            "viewer": {
+              "union": {
+                "child": [
+                  {
+                    "this": {}
+                  },
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "owner"
+                    }
+                  },
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "co_owner"
+                    }
+                  },
+                  {
+                    "tupleToUserset": {
+                      "tupleset": {
+                        "object": "",
+                        "relation": "bank_relation"
+                      },
+                      "computedUserset": {
+                        "object": "",
+                        "relation": "employee"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "withdrawer": {
+              "union": {
+                "child": [
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "owner"
+                    }
+                  },
+                  {
+                    "tupleToUserset": {
+                      "tupleset": {
+                        "object": "",
+                        "relation": "bank_relation"
+                      },
+                      "computedUserset": {
+                        "object": "",
+                        "relation": "manager"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "depositor": {
+              "union": {
+                "child": [
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "owner"
+                    }
+                  },
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "co_owner"
+                    }
+                  },
+                  {
+                    "tupleToUserset": {
+                      "tupleset": {
+                        "object": "",
+                        "relation": "bank_relation"
+                      },
+                      "computedUserset": {
+                        "object": "",
+                        "relation": "employee"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "transferer": {
+              "computedUserset": {
+                "object": "",
+                "relation": "owner"
+              }
+            },
+            "bank_relation": {
+              "this": {}
+            }
+          },
+          "metadata": {
+            "relations": {
+              "owner": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "co_owner": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "viewer": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "bank_relation": {
+                "directly_related_user_types": [
+                  {
+                    "type": "bank"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "transaction",
+          "relations": {
+            "initiator": {
+              "this": {}
+            },
+            "viewer": {
+              "union": {
+                "child": [
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "initiator"
+                    }
+                  },
+                  {
+                    "tupleToUserset": {
+                      "tupleset": {
+                        "object": "",
+                        "relation": "account_from"
+                      },
+                      "computedUserset": {
+                        "object": "",
+                        "relation": "viewer"
+                      }
+                    }
+                  },
+                  {
+                    "tupleToUserset": {
+                      "tupleset": {
+                        "object": "",
+                        "relation": "account_to"
+                      },
+                      "computedUserset": {
+                        "object": "",
+                        "relation": "viewer"
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            "account_from": {
+              "this": {}
+            },
+            "account_to": {
+              "this": {}
+            }
+          },
+          "metadata": {
+            "relations": {
+              "initiator": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "account_from": {
+                "directly_related_user_types": [
+                  {
+                    "type": "account"
+                  }
+                ]
+              },
+              "account_to": {
+                "directly_related_user_types": [
+                  {
+                    "type": "account"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "type": "loan",
+          "relations": {
+            "borrower": {
+              "this": {}
+            },
+            "loan_officer": {
+              "this": {}
+            },
+            "viewer": {
+              "union": {
+                "child": [
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "borrower"
+                    }
+                  },
+                  {
+                    "computedUserset": {
+                      "object": "",
+                      "relation": "loan_officer"
+                    }
+                  }
+                ]
+              }
+            },
+            "approver": {
+              "computedUserset": {
+                "object": "",
+                "relation": "loan_officer"
+              }
+            },
+            "modifier": {
+              "computedUserset": {
+                "object": "",
+                "relation": "loan_officer"
+              }
+            }
+          },
+          "metadata": {
+            "relations": {
+              "borrower": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              },
+              "loan_officer": {
+                "directly_related_user_types": [
+                  {
+                    "type": "user"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }

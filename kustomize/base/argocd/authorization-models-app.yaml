@@ -1,0 +1,201 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openfga-authorization-models
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: applications
+spec:
+  project: openfga-platform
+  source:
+    repoURL: 'https://github.com/jralmaraz/authcore-openfga-operator'
+    targetRevision: HEAD
+    path: examples/authorization-models
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: openfga-workloads
+  syncPolicy:
+    automated:
+      prune: false  # Don't auto-prune authorization models for safety
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - Replace=false
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: 'Description'
+    value: 'Manages OpenFGA authorization models and policies'
+  - name: 'Owner'
+    value: 'Security Team'
+  - name: 'Warning'
+    value: 'Authorization model changes require careful review'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: banking-authorization-models
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: applications
+    domain: banking
+spec:
+  project: openfga-platform
+  source:
+    repoURL: 'https://github.com/jralmaraz/authcore-openfga-operator'
+    targetRevision: HEAD
+    path: demos/banking-app/authorization-models
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: openfga-workloads
+  syncPolicy:
+    syncOptions:
+    - CreateNamespace=true
+    - Replace=false
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: 'Description'
+    value: 'Banking domain authorization models'
+  - name: 'Domain'
+    value: 'Banking'
+  - name: 'Models'
+    value: 'Account, Transaction, Loan authorization models'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: genai-authorization-models
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: applications
+    domain: genai
+spec:
+  project: openfga-platform
+  source:
+    repoURL: 'https://github.com/jralmaraz/authcore-openfga-operator'
+    targetRevision: HEAD
+    path: demos/genai-rag-agent/authorization-models
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: openfga-workloads
+  syncPolicy:
+    syncOptions:
+    - CreateNamespace=true
+    - Replace=false
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: 'Description'
+    value: 'GenAI RAG authorization models'
+  - name: 'Domain'
+    value: 'AI/ML'
+  - name: 'Models'
+    value: 'Document, Knowledge Base, Model access authorization'
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: authorization-model-backup
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: backup
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: model-backup
+            image: bitnami/kubectl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting authorization model backup..."
+              TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+              BACKUP_DIR="/backup/authorization-models/$TIMESTAMP"
+              mkdir -p $BACKUP_DIR
+              
+              # Export all OpenFGA CRDs
+              kubectl get openfgas -A -o yaml > $BACKUP_DIR/openfga-instances.yaml
+              
+              # Export authorization model configs
+              kubectl get configmaps -l app.kubernetes.io/component=authorization-model -A -o yaml > $BACKUP_DIR/authorization-models.yaml
+              
+              # Compress backup
+              cd /backup
+              tar -czf "authorization-models-backup-$TIMESTAMP.tar.gz" authorization-models/$TIMESTAMP/
+              
+              # Clean up old backups (keep last 30 days)
+              find /backup -name "authorization-models-backup-*.tar.gz" -mtime +30 -delete
+              
+              echo "Backup completed: authorization-models-backup-$TIMESTAMP.tar.gz"
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backup
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: argocd-backup-pvc
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: authorization-model-validation
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: validation
+spec:
+  schedule: "0 */6 * * *"  # Every 6 hours
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: model-validator
+            image: openfga/cli:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting authorization model validation..."
+              
+              # Get all OpenFGA instances
+              INSTANCES=$(kubectl get openfgas -A -o jsonpath='{.items[*].metadata.name}')
+              
+              for instance in $INSTANCES; do
+                echo "Validating instance: $instance"
+                NAMESPACE=$(kubectl get openfgas -A -o jsonpath="{.items[?(@.metadata.name=='$instance')].metadata.namespace}")
+                
+                # Get service endpoint
+                SERVICE_URL="http://$instance.$NAMESPACE.svc.cluster.local:8080"
+                
+                # Validate model syntax and relationships
+                fga model validate --api-url=$SERVICE_URL || echo "Validation failed for $instance"
+              done
+              
+              echo "Authorization model validation completed"
+            env:
+            - name: FGA_API_URL
+              value: "http://localhost:8080"

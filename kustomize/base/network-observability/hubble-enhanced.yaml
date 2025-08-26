@@ -1,0 +1,202 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hubble-tracing-config
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: hubble
+    app.kubernetes.io/component: network-observability
+data:
+  config.yaml: |
+    # Hubble tracing configuration for OpenFGA
+    tracing:
+      enabled: true
+      jaeger:
+        endpoint: "http://jaeger-collector:14268/api/traces"
+        samplingRate: 0.1
+      filters:
+        - name: "openfga-http"
+          sourceLabels:
+            app.kubernetes.io/name: "openfga"
+          protocols:
+            - "http"
+        - name: "openfga-grpc"
+          sourceLabels:
+            app.kubernetes.io/name: "openfga"
+          protocols:
+            - "grpc"
+        - name: "database-connections"
+          sourceLabels:
+            app.kubernetes.io/component: "database"
+          protocols:
+            - "tcp"
+        - name: "secrets-injection"
+          sourceLabels:
+            app.kubernetes.io/name: "dsv-injector"
+          protocols:
+            - "https"
+    metrics:
+      enabled: true
+      path: "/metrics"
+      port: 9965
+      labels:
+        - "source_app"
+        - "destination_app"
+        - "http_method"
+        - "http_status_code"
+        - "grpc_method"
+        - "grpc_code"
+    flowLogs:
+      enabled: true
+      format: "json"
+      destinations:
+        - type: "file"
+          path: "/var/log/hubble/flows.json"
+        - type: "webhook"
+          url: "http://flow-collector:8080/flows"
+          headers:
+            Authorization: "Bearer ${FLOW_TOKEN}"
+        - type: "elasticsearch"
+          url: "http://elasticsearch:9200"
+          index: "hubble-flows"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hubble-policy-config
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: hubble
+    app.kubernetes.io/component: network-observability
+data:
+  policies.yaml: |
+    # Network policy monitoring and alerting
+    monitoring:
+      networkPolicies:
+        - name: "policy-violations"
+          description: "Monitor network policy violations"
+          conditions:
+            - field: "verdict"
+              operator: "equals"
+              value: "DENIED"
+          actions:
+            - type: "alert"
+              severity: "warning"
+              webhook: "http://alertmanager:9093/api/v1/alerts"
+            - type: "log"
+              level: "warn"
+              message: "Network policy violation detected"
+        - name: "unauthorized-database-access"
+          description: "Monitor unauthorized database access attempts"
+          conditions:
+            - field: "destination_port"
+              operator: "in"
+              values: ["5432", "3306"]
+            - field: "verdict"
+              operator: "equals"
+              value: "DENIED"
+          actions:
+            - type: "alert"
+              severity: "critical"
+              webhook: "http://security-alerts:8080/database-access"
+        - name: "secrets-access-monitoring"
+          description: "Monitor DSV secrets access patterns"
+          conditions:
+            - field: "source_labels.app.kubernetes.io/name"
+              operator: "equals"
+              value: "dsv-injector"
+            - field: "destination_port"
+              operator: "equals"
+              value: "443"
+          actions:
+            - type: "log"
+              level: "info"
+              message: "Secrets access detected"
+            - type: "metric"
+              name: "dsv_access_total"
+              labels:
+                - "source_pod"
+                - "destination_fqdn"
+    dashboards:
+      enabled: true
+      grafana:
+        url: "http://grafana:3000"
+        dashboards:
+          - name: "OpenFGA Network Security"
+            path: "/dashboards/openfga-security.json"
+          - name: "Database Connectivity"
+            path: "/dashboards/database-connectivity.json"
+          - name: "Secrets Management"
+            path: "/dashboards/secrets-management.json"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hubble-flow-processor
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: hubble-flow-processor
+    app.kubernetes.io/component: network-observability
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hubble-flow-processor
+      app.kubernetes.io/component: network-observability
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hubble-flow-processor
+        app.kubernetes.io/component: network-observability
+    spec:
+      containers:
+      - name: flow-processor
+        image: quay.io/cilium/hubble:v0.12.2
+        command:
+        - hubble
+        - observe
+        - --server
+        - hubble-relay:80
+        - --follow
+        - --output
+        - json
+        env:
+        - name: HUBBLE_SERVER
+          value: "hubble-relay:80"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: config
+          mountPath: /etc/hubble
+        - name: logs
+          mountPath: /var/log/hubble
+      volumes:
+      - name: config
+        configMap:
+          name: hubble-tracing-config
+      - name: logs
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hubble-flow-processor
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: hubble-flow-processor
+    app.kubernetes.io/component: network-observability
+spec:
+  type: ClusterIP
+  ports:
+  - port: 9965
+    targetPort: 9965
+    protocol: TCP
+    name: metrics
+  selector:
+    app.kubernetes.io/name: hubble-flow-processor
+    app.kubernetes.io/component: network-observability

@@ -1,0 +1,190 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openfga-banking-demo
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: applications
+    demo: banking
+spec:
+  project: openfga-demos
+  source:
+    repoURL: 'https://github.com/jralmaraz/authcore-openfga-operator'
+    targetRevision: HEAD
+    path: demos/banking-app/k8s
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: openfga-demos
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
+  info:
+  - name: 'Description'
+    value: 'Banking application demo with OpenFGA authorization'
+  - name: 'Demo Type'
+    value: 'Banking'
+  - name: 'Features'
+    value: 'Account management, transactions, loan processing'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openfga-genai-demo
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: applications
+    demo: genai
+spec:
+  project: openfga-demos
+  source:
+    repoURL: 'https://github.com/jralmaraz/authcore-openfga-operator'
+    targetRevision: HEAD
+    path: demos/genai-rag-agent/k8s
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: openfga-demos
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
+  info:
+  - name: 'Description'
+    value: 'GenAI RAG agent demo with document-level authorization'
+  - name: 'Demo Type'
+    value: 'AI/ML'
+  - name: 'Features'
+    value: 'RAG queries, document access control, model permissions'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: openfga-demo-environments
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: applicationsets
+spec:
+  generators:
+  - matrix:
+      generators:
+      - list:
+          elements:
+          - demo: banking
+            path: demos/banking-app/k8s
+          - demo: genai
+            path: demos/genai-rag-agent/k8s
+      - list:
+          elements:
+          - env: dev
+            namespace: openfga-demos-dev
+            replicas: "1"
+          - env: staging
+            namespace: openfga-demos-staging
+            replicas: "2"
+  template:
+    metadata:
+      name: 'openfga-{{demo}}-{{env}}'
+      labels:
+        demo: '{{demo}}'
+        environment: '{{env}}'
+    spec:
+      project: openfga-demos
+      source:
+        repoURL: 'https://github.com/jralmaraz/authcore-openfga-operator'
+        targetRevision: HEAD
+        path: '{{path}}'
+        kustomize:
+          namePrefix: '{{env}}-'
+          commonLabels:
+            environment: '{{env}}'
+            demo: '{{demo}}'
+          patches:
+          - target:
+              kind: Deployment
+            patch: |
+              - op: replace
+                path: /spec/replicas
+                value: {{replicas}}
+      destination:
+        server: 'https://kubernetes.default.svc'
+        namespace: '{{namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+        - CreateNamespace=true
+        retry:
+          limit: 3
+          backoff:
+            duration: 5s
+            factor: 2
+            maxDuration: 2m
+      info:
+      - name: 'Demo'
+        value: '{{demo}}'
+      - name: 'Environment'
+        value: '{{env}}'
+      - name: 'Description'
+        value: 'OpenFGA {{demo}} demo in {{env}} environment'
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: demo-health-check
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: monitoring
+spec:
+  schedule: "*/15 * * * *"  # Every 15 minutes
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: health-checker
+            image: curlimages/curl:latest
+            command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Checking demo application health..."
+              
+              # Check banking demo
+              BANKING_URL="http://banking-app.openfga-demos.svc.cluster.local:3000/health"
+              if curl -f --max-time 10 $BANKING_URL; then
+                echo "✓ Banking demo is healthy"
+              else
+                echo "✗ Banking demo is unhealthy"
+              fi
+              
+              # Check GenAI demo
+              GENAI_URL="http://genai-rag-agent.openfga-demos.svc.cluster.local:8000/health"
+              if curl -f --max-time 10 $GENAI_URL; then
+                echo "✓ GenAI demo is healthy"
+              else
+                echo "✗ GenAI demo is unhealthy"
+              fi
+              
+              echo "Health check completed"
