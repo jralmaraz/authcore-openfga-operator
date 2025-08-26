@@ -1,0 +1,42 @@
+# Git
+.git
+.gitignore
+.github
+
+# Documentation
+*.md
+docs/
+issues/
+
+# Development files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Build artifacts 
+target/
+dist/
+
+# Dependencies
+node_modules/
+
+# Demo applications
+demos/
+examples/
+
+# Scripts (not needed for container build)
+scripts/
+
+# Docker files
+docker-compose.yml
+Dockerfile.*
+
+# Kubernetes files
+kustomize/
+crds/
+
+# Temporary files
+.tmp/
+tmp/
+*.tmp
