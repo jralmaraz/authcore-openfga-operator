@@ -424,13 +424,13 @@ main() {
     
     if [ "$banking_only" = true ]; then
         echo "Deploying Banking Demo only..."
-        "$SCRIPT_DIR/deploy-banking-demo.sh" "${script_args[@]}"
+        "$SCRIPT_DIR/deploy-banking-demo.sh" ${script_args[@]+"${script_args[@]}"}
     elif [ "$genai_only" = true ]; then
         echo "Deploying GenAI RAG Demo only..."
-        "$SCRIPT_DIR/deploy-genai-demo.sh" "${script_args[@]}"
+        "$SCRIPT_DIR/deploy-genai-demo.sh" ${script_args[@]+"${script_args[@]}"}
     else
         # Deploy both demos
-        deploy_both_demos "${script_args[@]}"
+        deploy_both_demos ${script_args[@]+"${script_args[@]}"}
     fi
     
     log_success "Demo deployment process completed!"
