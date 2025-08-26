@@ -347,6 +347,9 @@ main() {
     echo "    OpenFGA Demo Applications Deployment"
     echo "=================================================="
     echo
+
+    # Initialize script_args as an empty array to avoid unbound variable error
+    local script_args=()
     
     # Parse command line arguments
     local banking_only=false
@@ -415,7 +418,6 @@ main() {
         exit 1
     fi
     
-    local script_args=()
     if [ "$skip_build" = true ]; then
         script_args+=("--skip-build")
     fi
