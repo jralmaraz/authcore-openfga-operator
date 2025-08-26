@@ -17,11 +17,11 @@ ENV CARGO_HOME=$HOME/.cargo
 RUN mkdir -p $CARGO_HOME && chmod 755 $CARGO_HOME
 
 # Copy dependency files first for better layer caching
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 
 # Fix ownership of copied files (critical for Podman rootless builds)
 USER root
-RUN chown -R 1000:1000 /app/Cargo.toml /app/Cargo.lock
+RUN chown -R 1000:1000 /app/Cargo.toml
 USER 1000
 
 # Create dummy main.rs to build dependencies first
@@ -31,7 +31,7 @@ RUN mkdir -p src && echo "fn main() {}" > src/main.rs
 RUN mkdir -p /app/target && chmod 755 /app/target
 
 # Build dependencies (this creates .cargo-lock and other files)
-RUN cargo build --release --locked
+RUN cargo build --release
 
 # Fix permissions for build artifacts after dependency build (critical for .cargo-lock)
 USER root
@@ -43,13 +43,13 @@ RUN rm src/main.rs
 # Copy source code
 COPY . .
 
-# Fix ownership of all copied source files (critical for Podman rootless builds)
+# Fix ownership of all copied source files (critical for Podman rootless builds - after copying all source files)
 USER root
 RUN chown -R 1000:1000 /app
 USER 1000
 
 # Build the application (dependencies are already cached)
-RUN cargo build --release --locked
+RUN cargo build --release
 
 # Final permission fix for all build artifacts (ensures .cargo-lock access)
 USER root
