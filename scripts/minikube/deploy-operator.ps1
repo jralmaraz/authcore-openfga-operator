@@ -347,7 +347,7 @@ function Deploy-Operator {
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: openfga-operator
+  name: openfga-operator-project-controller-manager
   namespace: $OperatorNamespace
   labels:
     app: openfga-operator
@@ -412,7 +412,7 @@ function Wait-ForOperator {
     Write-Info "Waiting for operator to be ready..."
     
     # Wait for deployment to be available
-    kubectl wait --for=condition=available --timeout=300s deployment/openfga-operator -n $OperatorNamespace
+    kubectl wait --for=condition=available --timeout=300s deployment/openfga-operator-project-controller-manager -n $OperatorNamespace
     
     Write-Success "Operator is ready"
 }
@@ -554,7 +554,7 @@ function Write-NextSteps {
     Write-Host "   kubectl apply -f k8s/"
     Write-Host ""
     Write-Host "4. Monitor the operator:"
-    Write-Host "   kubectl logs -n $OperatorNamespace deployment/openfga-operator -f"
+    Write-Host "   kubectl logs -n $OperatorNamespace deployment/openfga-operator-project-controller-manager -f"
     Write-Host ""
     Write-Host "For more information, see the documentation in docs/minikube/"
 }

@@ -353,7 +353,7 @@ deploy_operator() {
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: openfga-operator
+  name: openfga-operator-project-controller-manager
   namespace: $OPERATOR_NAMESPACE
   labels:
     app: openfga-operator
@@ -426,10 +426,10 @@ EOF
 # Wait for operator to be ready
 wait_for_operator() {
     log_info "Waiting for operator to be ready..."
-    
+
     # Wait for deployment to be available
-    kubectl wait --for=condition=available --timeout=300s deployment/openfga-operator -n "$OPERATOR_NAMESPACE"
-    
+    kubectl wait --for=condition=available --timeout=300s deployment/openfga-operator-project-controller-manager -n "$OPERATOR_NAMESPACE"
+
     log_success "Operator is ready"
 }
 
@@ -642,7 +642,7 @@ print_next_steps() {
     echo "   cd demos/genai-rag-agent && kubectl apply -f k8s/"
     echo
     echo "4. Monitor the operator:"
-    echo "   kubectl logs -n $OPERATOR_NAMESPACE deployment/openfga-operator -f"
+    echo "   kubectl logs -n $OPERATOR_NAMESPACE deployment/openfga-operator-project-controller-manager -f"
     echo
     echo "For more information, see the documentation in docs/minikube/"
 }

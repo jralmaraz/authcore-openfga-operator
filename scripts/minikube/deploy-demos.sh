@@ -128,7 +128,7 @@ verify_operator_deployment() {
     fi
     
     # Wait for operator to be ready
-    if ! kubectl wait --for=condition=available --timeout=60s deployment/openfga-operator -n "$OPERATOR_NAMESPACE" >/dev/null 2>&1; then
+    if ! kubectl wait --for=condition=available --timeout=60s deployment/openfga-operator-project-controller-manager -n "$OPERATOR_NAMESPACE" >/dev/null 2>&1; then
         log_error "OpenFGA operator deployment is not ready."
         log_info "Please ensure the operator is running properly."
         exit 1
