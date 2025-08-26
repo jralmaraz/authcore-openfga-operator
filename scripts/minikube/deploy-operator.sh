@@ -249,11 +249,11 @@ build_container_image() {
     if [ "$use_minikube_env" = "true" ]; then
         # Build directly in Minikube's environment
         log_info "Building image directly in Minikube's Docker daemon..."
-        docker build -t openfga-operator:latest .
+        $runtime build -t openfga-operator:latest .
         eval $(minikube docker-env -u)
     else
         log_info "Building image locally..."
-        docker build -t openfga-operator:latest .
+        $runtime build -t openfga-operator:latest .
         log_info "Loading image into Minikube..."
         for attempt in {1..3}; do
             if minikube image load openfga-operator:latest; then
