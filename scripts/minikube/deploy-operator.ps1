@@ -448,7 +448,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: postgres
-  namespace: default
+  namespace: $OperatorNamespace
   labels:
     app: postgres
 spec:
@@ -493,7 +493,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres-service
-  namespace: default
+  namespace: $OperatorNamespace
   labels:
     app: postgres
 spec:
