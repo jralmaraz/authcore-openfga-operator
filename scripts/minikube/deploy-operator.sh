@@ -461,7 +461,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: postgres
-  namespace: default
+  namespace: $OPERATOR_NAMESPACE
   labels:
     app: postgres
 spec:
@@ -506,7 +506,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres-service
-  namespace: default
+  namespace: $OPERATOR_NAMESPACE
   labels:
     app: postgres
 spec:
@@ -574,7 +574,7 @@ apiVersion: authorization.openfga.dev/v1alpha1
 kind: OpenFGA
 metadata:
   name: $test_resource_name
-  namespace: default
+  namespace: $OPERATOR_NAMESPACE
 spec:
   image: "openfga/openfga:latest"
   replicas: 1
@@ -594,7 +594,7 @@ EOF
         sleep 5
         
         # Clean up test resource
-        kubectl delete openfga "$test_resource_name" -n default >/dev/null 2>&1 || log_warning "Failed to clean up test resource"
+        kubectl delete openfga "$test_resource_name" -n "$OPERATOR_NAMESPACE" >/dev/null 2>&1 || log_warning "Failed to clean up test resource"
         
         log_success "Operator functionality test passed"
     else

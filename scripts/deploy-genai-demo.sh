@@ -19,7 +19,7 @@ DEMO_IMAGE="genai-rag-agent:latest"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 GENAI_DEMO_DIR="$PROJECT_ROOT/demos/genai-rag-agent"
-NAMESPACE="default"
+NAMESPACE="openfga-system"
 
 # Logging functions
 log_info() {

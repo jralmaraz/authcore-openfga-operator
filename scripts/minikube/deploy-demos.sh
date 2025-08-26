@@ -14,7 +14,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 OPERATOR_NAMESPACE="openfga-system"
-DEMO_NAMESPACE="default"
+DEMO_NAMESPACE="openfga-system"
 BANKING_APP_IMAGE="banking-app:latest"
 GENAI_APP_IMAGE="genai-rag-agent:latest"
 TIMEOUT=300
