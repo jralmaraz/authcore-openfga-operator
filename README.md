@@ -494,8 +494,29 @@ The project includes GitHub Actions workflows for:
 - **Test Suite**: Runs unit tests
 - **Format Check**: Validates code formatting
 - **Clippy Check**: Runs Rust linter
+- **Container Image Build**: Builds and publishes container images
 
 These checks run automatically on pull requests and provide status checks.
+
+### Build Process Improvements
+
+The CI/CD pipeline has been optimized for reliability:
+
+- **Fixed Docker Tag Generation**: Resolved invalid tag format issues in pull request builds
+- **Multi-Platform Support**: Builds for both `linux/amd64` and `linux/arm64` architectures
+- **Registry Integration**: Automatic publishing to GitHub Container Registry (GHCR)
+- **Caching Optimization**: GitHub Actions cache for faster builds
+- **Build Failure Prevention**: Improved tag naming conventions to prevent format errors
+
+### Container Registry
+
+Images are automatically published to:
+- **Registry**: `ghcr.io/jralmaraz/authcore-openfga-operator`
+- **Tags**: 
+  - `latest` (main branch)
+  - `pr-{number}` (pull requests)
+  - `sha-{commit}` (specific commits)
+  - `v{version}` (releases)
 
 ## Project Structure
 
