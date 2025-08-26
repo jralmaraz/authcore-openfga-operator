@@ -1,0 +1,131 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: openfga-platform
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: projects
+spec:
+  description: "OpenFGA Platform Management Project"
+  sourceRepos:
+  - 'https://github.com/jralmaraz/authcore-openfga-operator'
+  - 'https://github.com/openfga/*'
+  - 'https://charts.openfga.dev'
+  destinations:
+  - namespace: openfga-system
+    server: 'https://kubernetes.default.svc'
+  - namespace: openfga-workloads
+    server: 'https://kubernetes.default.svc'
+  - namespace: argocd
+    server: 'https://kubernetes.default.svc'
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRole
+  - group: 'rbac.authorization.k8s.io'
+    kind: ClusterRoleBinding
+  - group: 'apiextensions.k8s.io'
+    kind: CustomResourceDefinition
+  - group: 'admissionregistration.k8s.io'
+    kind: ValidatingAdmissionWebhook
+  - group: 'admissionregistration.k8s.io'
+    kind: MutatingAdmissionWebhook
+  - group: 'storage.k8s.io'
+    kind: StorageClass
+  - group: 'networking.k8s.io'
+    kind: NetworkPolicy
+  namespaceResourceWhitelist:
+  - group: ''
+    kind: Secret
+  - group: ''
+    kind: ConfigMap
+  - group: ''
+    kind: Service
+  - group: ''
+    kind: ServiceAccount
+  - group: 'apps'
+    kind: Deployment
+  - group: 'apps'
+    kind: StatefulSet
+  - group: 'apps'
+    kind: DaemonSet
+  - group: 'batch'
+    kind: Job
+  - group: 'batch'
+    kind: CronJob
+  - group: 'authorization.openfga.dev'
+    kind: OpenFGA
+  - group: ''
+    kind: PersistentVolumeClaim
+  - group: 'networking.k8s.io'
+    kind: Ingress
+  roles:
+  - name: admin
+    description: "Full access to OpenFGA platform"
+    policies:
+    - p, proj:openfga-platform:admin, applications, *, openfga-platform/*, allow
+    - p, proj:openfga-platform:admin, repositories, *, *, allow
+    - p, proj:openfga-platform:admin, clusters, *, *, allow
+    groups:
+    - openfga-admins
+  - name: developer
+    description: "Developer access to OpenFGA applications"
+    policies:
+    - p, proj:openfga-platform:developer, applications, get, openfga-platform/*, allow
+    - p, proj:openfga-platform:developer, applications, sync, openfga-platform/*, allow
+    - p, proj:openfga-platform:developer, applications, action/*, openfga-platform/*, allow
+    - p, proj:openfga-platform:developer, repositories, get, *, allow
+    groups:
+    - openfga-developers
+  - name: operator
+    description: "Operator access for automated systems"
+    policies:
+    - p, proj:openfga-platform:operator, applications, *, openfga-platform/*, allow
+    - p, proj:openfga-platform:operator, repositories, get, *, allow
+    groups:
+    - openfga-operators
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: openfga-demos
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: projects
+spec:
+  description: "OpenFGA Demo Applications Project"
+  sourceRepos:
+  - 'https://github.com/jralmaraz/authcore-openfga-operator'
+  destinations:
+  - namespace: openfga-demos
+    server: 'https://kubernetes.default.svc'
+  - namespace: openfga-workloads
+    server: 'https://kubernetes.default.svc'
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+  namespaceResourceWhitelist:
+  - group: ''
+    kind: Secret
+  - group: ''
+    kind: ConfigMap
+  - group: ''
+    kind: Service
+  - group: ''
+    kind: ServiceAccount
+  - group: 'apps'
+    kind: Deployment
+  - group: 'authorization.openfga.dev'
+    kind: OpenFGA
+  - group: 'networking.k8s.io'
+    kind: Ingress
+  roles:
+  - name: demo-admin
+    description: "Full access to demo applications"
+    policies:
+    - p, proj:openfga-demos:demo-admin, applications, *, openfga-demos/*, allow
+    groups:
+    - openfga-demo-admins

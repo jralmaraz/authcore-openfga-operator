@@ -1,0 +1,161 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openfga-operator-config
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: applications
+spec:
+  project: openfga-platform
+  source:
+    repoURL: 'https://github.com/jralmaraz/authcore-openfga-operator'
+    targetRevision: HEAD
+    path: kustomize/base
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: openfga-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - PruneLast=true
+    - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 5m
+  info:
+  - name: 'Description'
+    value: 'OpenFGA Operator platform configuration'
+  - name: 'Components'
+    value: 'Operator, CRDs, Admission Controllers, Storage, Networking'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openfga-secrets-management
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: applications
+spec:
+  project: openfga-platform
+  source:
+    repoURL: 'https://github.com/jralmaraz/authcore-openfga-operator'
+    targetRevision: HEAD
+    path: kustomize/base/secrets-management
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: openfga-system
+  syncPolicy:
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: 'Description'
+    value: 'Delinea Vault secrets management for OpenFGA'
+  - name: 'Security'
+    value: 'Automatic secret injection and rotation'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openfga-monitoring
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: applications
+spec:
+  project: openfga-platform
+  source:
+    repoURL: 'https://github.com/jralmaraz/authcore-openfga-operator'
+    targetRevision: HEAD
+    path: kustomize/base/network-observability
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: openfga-system
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 2m
+  info:
+  - name: 'Description'
+    value: 'Cilium Hubble network observability for OpenFGA'
+  - name: 'Monitoring'
+    value: 'Network flow visualization and monitoring'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: openfga-environments
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: applicationsets
+spec:
+  generators:
+  - list:
+      elements:
+      - env: dev
+        cluster: https://kubernetes.default.svc
+        namespace: openfga-dev
+        branch: develop
+        syncPolicy: automated
+      - env: staging
+        cluster: https://kubernetes.default.svc
+        namespace: openfga-staging
+        branch: main
+        syncPolicy: manual
+      - env: prod
+        cluster: https://kubernetes.default.svc
+        namespace: openfga-production
+        branch: main
+        syncPolicy: manual
+  template:
+    metadata:
+      name: 'openfga-{{env}}'
+      labels:
+        environment: '{{env}}'
+    spec:
+      project: openfga-platform
+      source:
+        repoURL: 'https://github.com/jralmaraz/authcore-openfga-operator'
+        targetRevision: '{{branch}}'
+        path: kustomize/overlays/{{env}}
+      destination:
+        server: '{{cluster}}'
+        namespace: '{{namespace}}'
+      syncPolicy:
+        syncOptions:
+        - CreateNamespace=true
+        - PruneLast=true
+        retry:
+          limit: 3
+          backoff:
+            duration: 10s
+            factor: 2
+            maxDuration: 3m
+      info:
+      - name: 'Environment'
+        value: '{{env}}'
+      - name: 'Description'
+        value: 'OpenFGA {{env}} environment deployment'

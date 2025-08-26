@@ -13,6 +13,8 @@ resources:
   - admission-controller/
   - network-observability/
   - network-policies/
+  - secrets-management/
+  - argocd/
 
 labels:
   - pairs:

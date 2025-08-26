@@ -1,0 +1,168 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openfga-stores
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: applications
+spec:
+  project: openfga-platform
+  source:
+    repoURL: 'https://github.com/jralmaraz/authcore-openfga-operator'
+    targetRevision: HEAD
+    path: examples/stores
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: openfga-workloads
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+    - CreateNamespace=true
+    - PruneLast=true
+    - PrunePropagationPolicy=foreground
+    - Replace=false
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  info:
+  - name: 'Description'
+    value: 'Manages OpenFGA store instances and configurations'
+  - name: 'Owner'
+    value: 'Platform Team'
+  - name: 'Documentation'
+    value: 'https://github.com/jralmaraz/authcore-openfga-operator/docs'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openfga-stores-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: applications
+    environment: development
+spec:
+  project: openfga-platform
+  source:
+    repoURL: 'https://github.com/jralmaraz/authcore-openfga-operator'
+    targetRevision: develop
+    path: examples/stores
+    kustomize:
+      namePrefix: dev-
+      nameSuffix: -dev
+      commonLabels:
+        environment: development
+        tier: non-production
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: openfga-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - PruneLast=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 1m
+  info:
+  - name: 'Description'
+    value: 'Development environment OpenFGA stores'
+  - name: 'Environment'
+    value: 'Development'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openfga-stores-staging
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: applications
+    environment: staging
+spec:
+  project: openfga-platform
+  source:
+    repoURL: 'https://github.com/jralmaraz/authcore-openfga-operator'
+    targetRevision: main
+    path: examples/stores
+    kustomize:
+      namePrefix: staging-
+      nameSuffix: -staging
+      commonLabels:
+        environment: staging
+        tier: pre-production
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: openfga-staging
+  syncPolicy:
+    syncOptions:
+    - CreateNamespace=true
+    - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
+  info:
+  - name: 'Description'
+    value: 'Staging environment OpenFGA stores'
+  - name: 'Environment'
+    value: 'Staging'
+  - name: 'Approval Required'
+    value: 'Manual sync required for production readiness validation'
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: openfga-stores-prod
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd
+    app.kubernetes.io/component: applications
+    environment: production
+spec:
+  project: openfga-platform
+  source:
+    repoURL: 'https://github.com/jralmaraz/authcore-openfga-operator'
+    targetRevision: main
+    path: examples/stores
+    kustomize:
+      namePrefix: prod-
+      nameSuffix: -prod
+      commonLabels:
+        environment: production
+        tier: production
+  destination:
+    server: 'https://kubernetes.default.svc'
+    namespace: openfga-production
+  syncPolicy:
+    syncOptions:
+    - CreateNamespace=true
+    - PruneLast=true
+    - PrunePropagationPolicy=foreground
+    retry:
+      limit: 3
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 10m
+  info:
+  - name: 'Description'
+    value: 'Production OpenFGA stores - Manual sync only'
+  - name: 'Environment'
+    value: 'Production'
+  - name: 'Change Control'
+    value: 'All changes require approval and manual synchronization'

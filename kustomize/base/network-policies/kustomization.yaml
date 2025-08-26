@@ -7,3 +7,4 @@ resources:
   - keycloak-policies.yaml
   - storage-policies.yaml
   - monitoring-policies.yaml
+  - cilium-policies.yaml

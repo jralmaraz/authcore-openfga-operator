@@ -6,3 +6,4 @@ resources:
   - hubble-ui.yaml
   - hubble-relay.yaml
   - service-monitor.yaml
+  - hubble-enhanced.yaml

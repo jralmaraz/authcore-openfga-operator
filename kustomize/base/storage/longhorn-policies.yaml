@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: longhorn-volume-policies
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: longhorn
+    app.kubernetes.io/component: storage
+data:
+  backup-policy.yaml: |
+    apiVersion: longhorn.io/v1beta2
+    kind: RecurringJob
+    metadata:
+      name: openfga-daily-backup
+      namespace: longhorn-system
+    spec:
+      cron: "0 2 * * *"
+      task: "backup"
+      groups:
+      - "openfga"
+      retain: 30
+      concurrency: 2
+      labels:
+        job: "backup"
+        environment: "production"
+  snapshot-policy.yaml: |
+    apiVersion: longhorn.io/v1beta2
+    kind: RecurringJob
+    metadata:
+      name: openfga-hourly-snapshot
+      namespace: longhorn-system
+    spec:
+      cron: "0 */6 * * *"
+      task: "snapshot"
+      groups:
+      - "openfga"
+      retain: 24
+      concurrency: 3
+      labels:
+        job: "snapshot"
+        environment: "production"
+  volume-backup-policy.yaml: |
+    apiVersion: longhorn.io/v1beta2
+    kind: BackupTarget
+    metadata:
+      name: openfga-backup-target
+      namespace: longhorn-system
+    spec:
+      backupTargetURL: "s3://openfga-backups@us-west-2/"
+      credentialSecret: "longhorn-backup-credentials"
+      pollInterval: "300s"
+  disaster-recovery-policy.yaml: |
+    apiVersion: longhorn.io/v1beta2
+    kind: Volume
+    metadata:
+      name: openfga-postgres-data
+      namespace: longhorn-system
+    spec:
+      size: "100Gi"
+      numberOfReplicas: 3
+      dataLocality: "disabled"
+      restoreVolumeRecurringJob: "enabled"
+      snapshotMaxCount: 50
+      snapshotMaxSize: "10Gi"
+      recurringJobSelector:
+      - name: "openfga-daily-backup"
+      - name: "openfga-hourly-snapshot"

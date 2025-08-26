@@ -1,0 +1,219 @@
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: openfga-operator-policy
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: network-security
+spec:
+  endpointSelector:
+    matchLabels:
+      app: openfga-operator
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: kube-system
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+      - port: "8443"
+        protocol: TCP
+  - fromEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: openfga-workloads
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+  - toServices:
+    - k8sService:
+        serviceName: kubernetes
+        namespace: default
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+  - toEndpoints:
+    - matchLabels:
+        app.kubernetes.io/name: postgresql
+    toPorts:
+    - ports:
+      - port: "5432"
+        protocol: TCP
+  - toEndpoints:
+    - matchLabels:
+        app.kubernetes.io/name: mysql
+    toPorts:
+    - ports:
+      - port: "3306"
+        protocol: TCP
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: openfga-instances-policy
+  namespace: openfga-workloads
+  labels:
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/component: network-security
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: openfga
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        app.kubernetes.io/component: application
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+      - port: "8081"
+        protocol: TCP
+  - fromEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: openfga-demos
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+      - port: "8081"
+        protocol: TCP
+  - fromEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: ingress-nginx
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+  - toEndpoints:
+    - matchLabels:
+        app.kubernetes.io/name: postgresql
+        k8s:io.kubernetes.pod.namespace: openfga-system
+    toPorts:
+    - ports:
+      - port: "5432"
+        protocol: TCP
+  - toEndpoints:
+    - matchLabels:
+        app.kubernetes.io/name: mysql
+        k8s:io.kubernetes.pod.namespace: openfga-system
+    toPorts:
+    - ports:
+      - port: "3306"
+        protocol: TCP
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: dsv-injector-policy
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: dsv-injector
+    app.kubernetes.io/component: network-security
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: dsv-injector
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: kube-system
+    toPorts:
+    - ports:
+      - port: "8443"
+        protocol: TCP
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+  - toFQDNs:
+    - matchName: "vault.company.com"
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+  - toServices:
+    - k8sService:
+        serviceName: kubernetes
+        namespace: default
+    toPorts:
+    - ports:
+      - port: "443"
+        protocol: TCP
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: demo-applications-policy
+  namespace: openfga-demos
+  labels:
+    app.kubernetes.io/name: demo-apps
+    app.kubernetes.io/component: network-security
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/component: demo
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: ingress-nginx
+    toPorts:
+    - ports:
+      - port: "3000"
+        protocol: TCP
+      - port: "8000"
+        protocol: TCP
+  - fromEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: openfga-demos
+    toPorts:
+    - ports:
+      - port: "3000"
+        protocol: TCP
+      - port: "8000"
+        protocol: TCP
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        k8s:io.kubernetes.pod.namespace: kube-system
+        k8s-app: kube-dns
+    toPorts:
+    - ports:
+      - port: "53"
+        protocol: UDP
+  - toEndpoints:
+    - matchLabels:
+        app.kubernetes.io/name: openfga
+        k8s:io.kubernetes.pod.namespace: openfga-workloads
+    toPorts:
+    - ports:
+      - port: "8080"
+        protocol: TCP
+      - port: "8081"
+        protocol: TCP

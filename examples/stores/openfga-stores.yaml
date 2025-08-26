@@ -1,0 +1,103 @@
+apiVersion: authorization.openfga.dev/v1alpha1
+kind: OpenFGA
+metadata:
+  name: openfga-banking
+  namespace: openfga-workloads
+  labels:
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/component: banking-store
+    domain: banking
+spec:
+  replicas: 3
+  image: "openfga/openfga:v1.4.0"
+  datastore:
+    engine: "postgres"
+    uri: "postgresql://$(DATABASE_USERNAME):$(DATABASE_PASSWORD)@postgresql-openfga.openfga-system.svc.cluster.local:5432/openfga_banking"
+  playground:
+    enabled: true
+    port: 3000
+  grpc:
+    port: 8081
+  http:
+    port: 8080
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+---
+apiVersion: authorization.openfga.dev/v1alpha1
+kind: OpenFGA
+metadata:
+  name: openfga-genai
+  namespace: openfga-workloads
+  labels:
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/component: genai-store
+    domain: genai
+spec:
+  replicas: 2
+  image: "openfga/openfga:v1.4.0"
+  datastore:
+    engine: "postgres"
+    uri: "postgresql://$(DATABASE_USERNAME):$(DATABASE_PASSWORD)@postgresql-openfga.openfga-system.svc.cluster.local:5432/openfga_genai"
+  playground:
+    enabled: true
+    port: 3000
+  grpc:
+    port: 8081
+  http:
+    port: 8080
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+---
+apiVersion: authorization.openfga.dev/v1alpha1
+kind: OpenFGA
+metadata:
+  name: openfga-enterprise
+  namespace: openfga-workloads
+  labels:
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/component: enterprise-store
+    domain: enterprise
+spec:
+  replicas: 5
+  image: "openfga/openfga:v1.4.0"
+  datastore:
+    engine: "postgres"
+    uri: "postgresql://$(DATABASE_USERNAME):$(DATABASE_PASSWORD)@postgresql-openfga.openfga-system.svc.cluster.local:5432/openfga_enterprise"
+  playground:
+    enabled: false  # Disabled for production
+  grpc:
+    port: 8081
+    tls:
+      enabled: true
+      cert: "/etc/tls/grpc/tls.crt"
+      key: "/etc/tls/grpc/tls.key"
+  http:
+    port: 8080
+    tls:
+      enabled: true
+      cert: "/etc/tls/http/tls.crt"
+      key: "/etc/tls/http/tls.key"
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+  storage:
+    storageClass: "portworx-sc-db"
+    size: "100Gi"
+  backup:
+    enabled: true
+    schedule: "0 2 * * *"
+    retention: "30d"
