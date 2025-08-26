@@ -24,6 +24,18 @@ kubeconfig
 /dist/
 /build/
 
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.pytest_cache/
+
 # Demo environment files
 .env.docker
 .env.docker.bak

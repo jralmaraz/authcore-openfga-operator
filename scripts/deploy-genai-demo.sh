@@ -126,32 +126,124 @@ check_prerequisites() {
     log_success "All prerequisites satisfied"
 }
 
+# Check if OpenFGA operator is available
+check_openfga_operator() {
+    log_info "Checking for OpenFGA operator..."
+    
+    # Check if the OpenFGA CRD exists
+    if ! kubectl get crd openfgas.authorization.openfga.dev >/dev/null 2>&1; then
+        log_warning "OpenFGA operator CRD not found"
+        echo "The OpenFGA operator needs to be deployed first."
+        echo "Run: ./scripts/minikube/deploy-operator.sh"
+        echo ""
+        read -p "Do you want to continue without the operator? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            log_error "OpenFGA operator is recommended for this demo"
+            exit 1
+        fi
+        return 1
+    fi
+    
+    # Check if operator is running
+    local operator_pods
+    operator_pods=$(kubectl get pods -n openfga-system -l app.kubernetes.io/name=openfga-operator --no-headers 2>/dev/null | wc -l)
+    
+    if [ "$operator_pods" -eq 0 ]; then
+        log_warning "OpenFGA operator not running"
+        echo "The OpenFGA operator needs to be deployed first."
+        echo "Run: ./scripts/minikube/deploy-operator.sh"
+        echo ""
+        read -p "Do you want to continue without the operator? (y/N): " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+            log_error "OpenFGA operator is recommended for this demo"
+            exit 1
+        fi
+        return 1
+    fi
+    
+    log_success "Found OpenFGA operator"
+    return 0
+}
+
 # Check if OpenFGA instance exists
 check_openfga_instance() {
     log_info "Checking for OpenFGA instance..."
     
+    # First check if operator is available
+    local has_operator=false
+    if check_openfga_operator; then
+        has_operator=true
+    fi
+    
+    # Check for operator-managed OpenFGA instances first
+    local openfga_resources=0
+    if [ "$has_operator" = true ]; then
+        openfga_resources=$(kubectl get openfgas.authorization.openfga.dev --no-headers 2>/dev/null | wc -l)
+        
+        if [ "$openfga_resources" -gt 0 ]; then
+            log_success "Found operator-managed OpenFGA instance(s)"
+            
+            # Check if basic instance exists
+            if kubectl get openfgas.authorization.openfga.dev openfga-basic >/dev/null 2>&1; then
+                log_success "Found basic OpenFGA instance managed by operator"
+                return 0
+            fi
+        fi
+    fi
+    
+    # Fall back to checking for standard services
     local openfga_services
     openfga_services=$(kubectl get services -l app=openfga --no-headers 2>/dev/null | wc -l)
     
-    if [ "$openfga_services" -eq 0 ]; then
+    if [ "$openfga_services" -eq 0 ] && [ "$openfga_resources" -eq 0 ]; then
         log_warning "No OpenFGA instance found"
-        echo "You need to deploy an OpenFGA instance first."
-        echo "Run: kubectl apply -f examples/basic-openfga.yaml"
-        echo ""
-        read -p "Do you want to deploy a basic OpenFGA instance now? (y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            log_info "Deploying basic OpenFGA instance..."
-            kubectl apply -f "$PROJECT_ROOT/examples/basic-openfga.yaml"
-            
-            log_info "Waiting for OpenFGA to be ready..."
-            kubectl wait --for=condition=available --timeout=300s deployment/openfga-basic || {
-                log_warning "OpenFGA deployment is taking longer than expected"
-                log_info "You can check the status with: kubectl get pods -l app=openfga"
-            }
+        
+        if [ "$has_operator" = true ]; then
+            echo "You need to deploy an OpenFGA instance using the operator."
+            echo "Run: kubectl apply -f examples/basic-openfga.yaml"
+            echo ""
+            read -p "Do you want to deploy a basic OpenFGA instance now? (y/N): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                log_info "Deploying basic OpenFGA instance using operator..."
+                kubectl apply -f "$PROJECT_ROOT/examples/basic-openfga.yaml"
+                
+                log_info "Waiting for OpenFGA to be ready..."
+                # Wait for the OpenFGA resource to be created
+                kubectl wait --for=condition=Ready --timeout=300s openfgas.authorization.openfga.dev/openfga-basic 2>/dev/null || {
+                    # Fall back to waiting for deployment if condition is not available
+                    kubectl wait --for=condition=available --timeout=300s deployment/openfga-basic 2>/dev/null || {
+                        log_warning "OpenFGA deployment is taking longer than expected"
+                        log_info "You can check the status with: kubectl get openfgas.authorization.openfga.dev"
+                        log_info "Or check pods with: kubectl get pods -l app=openfga"
+                    }
+                }
+            else
+                log_error "OpenFGA instance is required for the GenAI RAG demo"
+                exit 1
+            fi
         else
-            log_error "OpenFGA instance is required for the GenAI RAG demo"
-            exit 1
+            echo "You need to deploy an OpenFGA instance first."
+            echo "Recommended: Use the operator by running ./scripts/minikube/deploy-operator.sh"
+            echo "Alternative: Run kubectl apply -f examples/basic-openfga.yaml"
+            echo ""
+            read -p "Do you want to deploy a basic OpenFGA instance now? (y/N): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                log_info "Deploying basic OpenFGA instance..."
+                kubectl apply -f "$PROJECT_ROOT/examples/basic-openfga.yaml"
+                
+                log_info "Waiting for OpenFGA to be ready..."
+                kubectl wait --for=condition=available --timeout=300s deployment/openfga-basic || {
+                    log_warning "OpenFGA deployment is taking longer than expected"
+                    log_info "You can check the status with: kubectl get pods -l app=openfga"
+                }
+            else
+                log_error "OpenFGA instance is required for the GenAI RAG demo"
+                exit 1
+            fi
         fi
     else
         log_success "Found OpenFGA instance"
@@ -176,6 +268,7 @@ build_demo_app() {
     # Install dependencies
     log_info "Installing Python dependencies..."
     pip install --upgrade pip
+    pip install --upgrade setuptools
     pip install -r requirements.txt
     
     log_success "GenAI RAG demo application built successfully"
@@ -208,9 +301,42 @@ setup_openfga_store() {
     
     cd "$GENAI_DEMO_DIR"
     
+    # Find the OpenFGA HTTP service
+    local openfga_service=""
+    
+    # First try to find operator-managed service
+    if kubectl get openfgas.authorization.openfga.dev openfga-basic >/dev/null 2>&1; then
+        # Look for the HTTP service created by the operator
+        openfga_service=$(kubectl get services -l app.kubernetes.io/name=openfga,app.kubernetes.io/instance=openfga-basic --no-headers 2>/dev/null | grep http | head -1 | awk '{print $1}')
+        
+        # If not found, try the standard naming pattern
+        if [ -z "$openfga_service" ]; then
+            openfga_service="openfga-basic-http"
+        fi
+    else
+        # Fall back to looking for basic service
+        openfga_service="openfga-basic-http"
+    fi
+    
+    # Verify the service exists
+    if ! kubectl get service "$openfga_service" >/dev/null 2>&1; then
+        log_warning "Could not find OpenFGA HTTP service: $openfga_service"
+        log_info "Looking for any OpenFGA HTTP service..."
+        
+        # Try to find any OpenFGA service with 'http' in the name
+        openfga_service=$(kubectl get services --no-headers 2>/dev/null | grep -E "(openfga.*http|http.*openfga)" | head -1 | awk '{print $1}')
+        
+        if [ -z "$openfga_service" ]; then
+            log_error "No OpenFGA HTTP service found. Please ensure OpenFGA is deployed correctly."
+            return 1
+        fi
+        
+        log_info "Found OpenFGA service: $openfga_service"
+    fi
+    
     # Port-forward to OpenFGA in background
-    log_info "Setting up port-forward to OpenFGA..."
-    kubectl port-forward service/openfga-basic-http 8080:8080 >/dev/null 2>&1 &
+    log_info "Setting up port-forward to OpenFGA service: $openfga_service"
+    kubectl port-forward "service/$openfga_service" 8080:8080 >/dev/null 2>&1 &
     local port_forward_pid=$!
     
     # Give port-forward time to establish
@@ -267,8 +393,19 @@ show_status() {
     kubectl get services -l app=genai-rag-agent
     echo
     
+    # Check for operator-managed OpenFGA instances
+    if kubectl get crd openfgas.authorization.openfga.dev >/dev/null 2>&1; then
+        echo "OpenFGA operator-managed instances:"
+        kubectl get openfgas.authorization.openfga.dev 2>/dev/null || echo "No operator-managed instances found"
+        echo
+    fi
+    
     echo "OpenFGA pods:"
     kubectl get pods -l app=openfga
+    echo
+    
+    echo "OpenFGA services:"
+    kubectl get services -l app=openfga
     echo
 }
 
@@ -465,6 +602,14 @@ main() {
     
     # Main deployment flow
     check_prerequisites
+    
+    # Check for operator and OpenFGA instance  
+    if check_openfga_operator; then
+        log_info "Using OpenFGA operator for deployment"
+    else
+        log_info "Proceeding without OpenFGA operator"
+    fi
+    
     check_openfga_instance
     
     if [ "$skip_build" = false ]; then
