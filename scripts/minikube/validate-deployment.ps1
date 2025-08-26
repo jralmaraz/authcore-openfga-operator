@@ -142,7 +142,7 @@ function Test-Operator {
     
     # Check if deployment is ready
     try {
-        kubectl wait --for=condition=available --timeout=30s deployment/openfga-operator -n $OperatorNamespace 2>$null | Out-Null
+        kubectl wait --for=condition=available --timeout=30s deployment/openfga-operator-project-controller-manager -n $OperatorNamespace 2>$null | Out-Null
         Write-Success "Operator deployment is available"
     }
     catch {
@@ -342,7 +342,7 @@ function Test-OperatorLogs {
     
     try {
         # Get recent logs from operator
-        $logs = kubectl logs -n $OperatorNamespace deployment/openfga-operator --tail=50 2>$null
+        $logs = kubectl logs -n $OperatorNamespace deployment/openfga-operator-project-controller-manager --tail=50 2>$null
         
         if (-not $logs) {
             Write-Warning "No operator logs available"
@@ -441,7 +441,7 @@ function Write-NextSteps {
     Write-Host "   kubectl port-forward service/banking-app 3000:3000"
     Write-Host ""
     Write-Host "3. Monitor the system:"
-    Write-Host "   kubectl logs -n $OperatorNamespace deployment/openfga-operator -f"
+    Write-Host "   kubectl logs -n $OperatorNamespace deployment/openfga-operator-project-controller-manager -f"
     Write-Host "   kubectl get events --sort-by=.metadata.creationTimestamp"
     Write-Host ""
     Write-Host "4. Create more OpenFGA instances:"

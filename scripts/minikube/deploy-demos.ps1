@@ -163,7 +163,7 @@ function Test-OperatorDeployment {
     
     # Wait for operator to be ready
     try {
-        kubectl wait --for=condition=available --timeout=60s deployment/openfga-operator -n $OPERATOR_NAMESPACE 2>$null | Out-Null
+        kubectl wait --for=condition=available --timeout=60s deployment/openfga-operator-project-controller-manager -n $OPERATOR_NAMESPACE 2>$null | Out-Null
         if ($LASTEXITCODE -ne 0) {
             Write-Error "OpenFGA operator deployment is not ready."
             Write-Info "Please ensure the operator is running properly."
