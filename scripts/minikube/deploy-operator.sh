@@ -451,7 +451,7 @@ build_container_image() {
             
             # Try standard minikube image load first (faster if it works)
             local standard_load_success=false
-            for attempt in {1..2}; do
+            for attempt in $(seq 1 2); do
                 if minikube image load openfga-operator:latest 2>/dev/null; then
                     log_success "Standard image load successful"
                     standard_load_success=true
@@ -473,7 +473,7 @@ build_container_image() {
         else
             # For Docker, use the existing retry logic
             log_info "Loading image into Minikube..."
-            for attempt in {1..3}; do
+            for attempt in $(seq 1 3); do
                 if minikube image load openfga-operator:latest; then
                     log_success "Image loaded successfully into Minikube"
                     break
@@ -911,7 +911,7 @@ main() {
     echo
     read -p "Do you want to deploy PostgreSQL example? (y/N): " -n 1 -r
     echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    if [ "$REPLY" = "y" ] || [ "$REPLY" = "Y" ]; then
         deploy_postgres_example
     fi
     
