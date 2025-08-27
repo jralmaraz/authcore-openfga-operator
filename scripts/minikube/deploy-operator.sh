@@ -228,6 +228,196 @@ load_image_to_minikube() {
     done
 }
 
+# Save Podman image as tarball for manual transfer
+save_podman_image_as_tarball() {
+    local image="$1"
+    local tarball_path="$2"
+    
+    log_info "Saving Podman image '$image' as tarball..."
+    
+    if podman save "$image" -o "$tarball_path" 2>/dev/null; then
+        log_success "Image '$image' saved as tarball: $tarball_path"
+        
+        # Verify tarball was created and has content
+        if [ -f "$tarball_path" ] && [ -s "$tarball_path" ]; then
+            local tarball_size=$(stat -c%s "$tarball_path" 2>/dev/null || stat -f%z "$tarball_path" 2>/dev/null)
+            log_info "Tarball size: $((tarball_size / 1024 / 1024)) MB"
+            return 0
+        else
+            log_error "Tarball creation failed or file is empty"
+            return 1
+        fi
+    else
+        log_error "Failed to save Podman image '$image' as tarball"
+        return 1
+    fi
+}
+
+# Transfer tarball to Minikube and import it
+transfer_and_import_tarball() {
+    local tarball_path="$1"
+    local image_name="$2"
+    
+    log_info "Transferring tarball to Minikube and importing..."
+    
+    # Load the tarball into Minikube using minikube image load with tarball
+    if minikube image load "$tarball_path" 2>/dev/null; then
+        log_success "Successfully transferred and imported tarball into Minikube"
+        return 0
+    else
+        log_warning "Direct tarball load failed, trying alternative approach..."
+        
+        # Alternative: Copy tarball to Minikube and import via containerd
+        local minikube_tarball_path="/tmp/$(basename "$tarball_path")"
+        
+        # Copy tarball to Minikube
+        if minikube cp "$tarball_path" "$minikube_tarball_path" 2>/dev/null; then
+            log_info "Tarball copied to Minikube: $minikube_tarball_path"
+            
+            # Import image via containerd
+            if minikube ssh "sudo ctr -n k8s.io images import $minikube_tarball_path" 2>/dev/null; then
+                log_success "Image imported into Minikube's containerd runtime"
+                
+                # Clean up tarball in Minikube
+                minikube ssh "sudo rm -f $minikube_tarball_path" 2>/dev/null || log_warning "Failed to clean up tarball in Minikube"
+                return 0
+            else
+                log_error "Failed to import image via containerd"
+                # Clean up on failure
+                minikube ssh "sudo rm -f $minikube_tarball_path" 2>/dev/null
+                return 1
+            fi
+        else
+            log_error "Failed to copy tarball to Minikube"
+            return 1
+        fi
+    fi
+}
+
+# Verify image SHA hash in Minikube
+verify_image_sha_in_minikube() {
+    local image="$1"
+    local expected_sha="$2"
+    
+    log_info "Verifying image SHA hash in Minikube..."
+    
+    # Get image SHA from Minikube
+    local minikube_sha
+    minikube_sha=$(minikube ssh "sudo ctr -n k8s.io images ls name==$image -q" 2>/dev/null | head -1)
+    
+    if [ -z "$minikube_sha" ]; then
+        # Try alternative method using crictl
+        minikube_sha=$(minikube ssh "sudo crictl images --digest" 2>/dev/null | grep "$image" | awk '{print $2}' | head -1)
+    fi
+    
+    if [ -z "$minikube_sha" ]; then
+        log_warning "Could not retrieve image SHA from Minikube, skipping SHA verification"
+        return 0
+    fi
+    
+    log_info "Minikube image SHA: $minikube_sha"
+    
+    if [ -n "$expected_sha" ]; then
+        if echo "$minikube_sha" | grep -q "$expected_sha"; then
+            log_success "Image SHA verification passed"
+            return 0
+        else
+            log_error "Image SHA verification failed"
+            log_error "Expected: $expected_sha"
+            log_error "Found: $minikube_sha"
+            return 1
+        fi
+    else
+        log_info "No expected SHA provided, verification skipped"
+        return 0
+    fi
+}
+
+# Get local image SHA for verification
+get_local_image_sha() {
+    local image="$1"
+    local runtime="$2"
+    
+    case "$runtime" in
+        podman)
+            podman inspect "$image" --format='{{.Id}}' 2>/dev/null | cut -d: -f2 | head -c 12
+            ;;
+        docker)
+            docker inspect "$image" --format='{{.Id}}' 2>/dev/null | cut -d: -f2 | head -c 12
+            ;;
+        *)
+            log_warning "Unknown runtime '$runtime' for SHA extraction"
+            echo ""
+            ;;
+    esac
+}
+
+# Manual Podman image upload with tarball approach
+manual_podman_image_upload() {
+    local image="$1"
+    local max_retries="${2:-3}"
+    
+    log_info "Starting manual Podman image upload process..."
+    
+    # Create temporary directory for tarball
+    local temp_dir="/tmp/minikube-image-upload-$$"
+    local tarball_path="$temp_dir/$(echo "$image" | tr '/:' '_').tar"
+    
+    mkdir -p "$temp_dir" || {
+        log_error "Failed to create temporary directory: $temp_dir"
+        return 1
+    }
+    
+    # Ensure cleanup on exit
+    trap "rm -rf $temp_dir" EXIT
+    
+    # Get local image SHA for verification
+    local local_sha
+    local_sha=$(get_local_image_sha "$image" "podman")
+    log_info "Local image SHA: ${local_sha:-"unknown"}"
+    
+    # Save image as tarball
+    if ! save_podman_image_as_tarball "$image" "$tarball_path"; then
+        log_error "Failed to save image as tarball"
+        return 1
+    fi
+    
+    # Transfer and import tarball with retries
+    local attempt
+    for attempt in $(seq 1 $max_retries); do
+        log_info "Transfer attempt $attempt of $max_retries..."
+        
+        if transfer_and_import_tarball "$tarball_path" "$image"; then
+            log_success "Tarball transfer and import completed successfully"
+            
+            # Verify image is available in Minikube
+            if verify_image_in_minikube "$image" 2; then
+                log_success "Image verification in Minikube passed"
+                
+                # Verify SHA if available
+                if [ -n "$local_sha" ]; then
+                    verify_image_sha_in_minikube "$image" "$local_sha"
+                fi
+                
+                log_success "Manual Podman image upload completed successfully"
+                return 0
+            else
+                log_warning "Image verification failed on attempt $attempt"
+            fi
+        else
+            log_warning "Transfer failed on attempt $attempt"
+        fi
+        
+        if [ $attempt -lt $max_retries ]; then
+            log_info "Retrying in 5 seconds..."
+            sleep 5
+        fi
+    done
+    
+    log_error "Manual Podman image upload failed after $max_retries attempts"
+    return 1
+}
+
 build_container_image() {
     local runtime
     runtime=$(get_container_runtime)
@@ -254,16 +444,45 @@ build_container_image() {
     else
         log_info "Building image locally..."
         $runtime build -t openfga-operator:latest .
-        log_info "Loading image into Minikube..."
-        for attempt in {1..3}; do
-            if minikube image load openfga-operator:latest; then
-                log_info "Image loaded successfully into Minikube"
-                break
-            else
-                log_warning "Failed to load image 'openfga-operator:latest', retrying in 5 seconds..."
-                sleep 5
+        
+        # Handle image loading based on runtime
+        if [ "$runtime" = "podman" ]; then
+            log_info "Using Podman - attempting standard image load first..."
+            
+            # Try standard minikube image load first (faster if it works)
+            local standard_load_success=false
+            for attempt in {1..2}; do
+                if minikube image load openfga-operator:latest 2>/dev/null; then
+                    log_success "Standard image load successful"
+                    standard_load_success=true
+                    break
+                else
+                    log_warning "Standard image load failed (attempt $attempt/2)"
+                    sleep 2
+                fi
+            done
+            
+            # If standard load failed, use manual tarball approach
+            if [ "$standard_load_success" = "false" ]; then
+                log_info "Standard load failed, falling back to manual Podman tarball upload..."
+                if ! manual_podman_image_upload "openfga-operator:latest"; then
+                    log_error "Manual Podman image upload failed"
+                    return 1
+                fi
             fi
-        done
+        else
+            # For Docker, use the existing retry logic
+            log_info "Loading image into Minikube..."
+            for attempt in {1..3}; do
+                if minikube image load openfga-operator:latest; then
+                    log_success "Image loaded successfully into Minikube"
+                    break
+                else
+                    log_warning "Failed to load image 'openfga-operator:latest', retrying in 5 seconds..."
+                    sleep 5
+                fi
+            done
+        fi
     fi
 }
 
