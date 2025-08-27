@@ -99,12 +99,39 @@ eval $(minikube docker-env -u)
 
 ### Podman with Minikube
 
-When using Podman:
+When using Podman, the script now includes enhanced manual upload capabilities:
 
 ```bash
-# Podman requires image loading approach
+# Podman with automatic fallback to manual upload
 CONTAINER_RUNTIME=podman make container-build minikube-load
+
+# Or use the deploy script directly (includes automatic fallback)
+CONTAINER_RUNTIME=podman ./scripts/minikube/deploy-operator.sh
 ```
+
+#### Manual Podman Upload Process
+
+If standard image loading fails, the script automatically:
+
+1. **Saves image as tarball**: Uses `podman save` to create a portable image file
+2. **Transfers to Minikube**: Copies tarball and imports via containerd
+3. **Verifies integrity**: Checks SHA hashes to ensure proper upload
+4. **Cleanup**: Removes temporary files automatically
+
+#### Advanced Troubleshooting
+
+For persistent Podman issues:
+
+```bash
+# Check if manual upload functions are working
+source scripts/minikube/deploy-operator.sh
+manual_podman_image_upload "openfga-operator:latest"
+
+# Verify image in Minikube
+minikube ssh "sudo ctr -n k8s.io images ls" | grep openfga-operator
+```
+
+See [Manual Podman Upload Guide](manual-podman-upload.md) for detailed information.
 
 ### Driver Compatibility
 
