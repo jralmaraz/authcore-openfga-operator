@@ -21,8 +21,7 @@ dist/
 # Dependencies
 node_modules/
 
-# Demo applications
-demos/
+# Demo applications (demos/ needed for compilation, examples/ excluded)
 examples/
 
 # Scripts (not needed for container build)
