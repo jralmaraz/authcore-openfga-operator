@@ -36,6 +36,7 @@ The OpenFGA Operator provides a Kubernetes-native way to deploy and manage OpenF
 ## Documentation
 
 ### 📚 Comprehensive Documentation
+- **[Alpha Release Guide](docs/releases/ALPHA_RELEASE.md)**: Complete deployment and usage guide for v0.1.0-alpha
 - **[Security Architecture](docs/security/SECURITY_ARCHITECTURE.md)**: Detailed security design and implementation
 - **[Design Documentation](docs/design/ARCHITECTURE.md)**: Complete system architecture and design patterns
 - **[Product Roadmap](docs/roadmap/ROADMAP.md)**: Strategic vision and release planning
@@ -179,6 +180,22 @@ The registry-based approach resolves the "image is not known and cannot be cache
 
 ### Production Installation
 
+#### Deploy Alpha Release (Recommended)
+
+For the alpha release, you can deploy directly from the container registry:
+
+```bash
+# Install CRDs
+make install-crds
+
+# Deploy from registry (easiest method)
+IMAGE_TAG=v0.1.0-alpha make minikube-deploy-registry
+
+# Or pull and deploy manually
+docker pull ghcr.io/jralmaraz/authcore-openfga-operator:v0.1.0-alpha
+kubectl apply -f k8s/
+```
+
 #### Install CRDs
 
 ```bash
@@ -188,19 +205,15 @@ make install-crds
 #### Deploy the Operator
 
 ```bash
-# Build the operator
+# Option 1: Deploy from registry (recommended for alpha)
+IMAGE_TAG=v0.1.0-alpha make minikube-deploy-registry
+
+# Option 2: Build and deploy locally
 make build
-
-# Build container image (auto-detects Docker or Podman)
 make container-build
+make minikube-deploy-local
 
-# Or specify runtime explicitly
-CONTAINER_RUNTIME=podman make container-build
-
-# Legacy Docker build command (still works)
-make docker-build
-
-# Deploy to your cluster (deployment manifests coming soon)
+# Option 3: Manual deployment
 kubectl apply -f k8s/
 ```
 
@@ -553,14 +566,14 @@ These checks run automatically on pull requests and provide status checks.
 
 ## Roadmap and Releases
 
-### Current Release (v1.0.0) - Security Foundation ✅
+### Current Release (v0.1.0-alpha) - Alpha Foundation ✅
 - Core operator functionality with security-first design
 - Advanced admission controller framework
 - Git commit verification and developer authentication
 - Malicious code injection analysis
 - Container image scanning and vulnerability assessment
 
-### Next Release (v1.1.0) - Enhanced Protection 🚧
+### Next Release (v0.2.0) - Enhanced Protection 🚧
 - AI-powered threat detection and behavioral analysis
 - Advanced incident response automation
 - Multi-tenancy support with enhanced isolation
@@ -568,8 +581,8 @@ These checks run automatically on pull requests and provide status checks.
 - Advanced compliance reporting
 
 ### Future Releases 📋
-- **v1.2.0**: Multi-cluster management and edge computing
-- **v2.0.0**: Next-generation features
+- **v0.3.0**: Multi-cluster management and edge computing
+- **v1.0.0**: First stable release
 
 For detailed roadmap information, see [Product Roadmap](docs/roadmap/ROADMAP.md).
 
