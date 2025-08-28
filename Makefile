@@ -4,6 +4,8 @@
 IMAGE_REGISTRY ?= ghcr.io/jralmaraz/authcore-openfga-operator
 IMAGE_TAG ?= latest
 LOCAL_IMAGE_NAME ?= openfga-operator:latest
+VERSION ?= $(shell grep '^version = ' Cargo.toml | cut -d '"' -f 2)
+ALPHA_VERSION ?= v0.1.0-alpha
 
 # Default target
 all: compile build
@@ -359,3 +361,54 @@ help:
 	@echo "Local build deployment (for development):"
 	@echo "  make minikube-deploy-local                 # Deploy using local build"
 	@echo "  make minikube-setup-and-deploy-local       # Complete setup with local build"
+	@echo ""
+	@echo "Alpha release targets:"
+	@echo "  make alpha-build                           # Build alpha release image"
+	@echo "  make alpha-push                            # Push alpha release image to registry"
+	@echo "  make alpha-release                         # Build, push and tag alpha release"
+
+# Alpha release targets
+alpha-build:
+	@echo "Building alpha release image..."
+	@RUNTIME=$$($(MAKE) detect-runtime 2>/dev/null); \
+	if [ -n "$$RUNTIME" ]; then \
+		echo "Using container runtime: $$RUNTIME"; \
+		$$RUNTIME build -t $(IMAGE_REGISTRY):$(ALPHA_VERSION) .; \
+		$$RUNTIME tag $(IMAGE_REGISTRY):$(ALPHA_VERSION) $(IMAGE_REGISTRY):latest; \
+		echo "✓ Built image: $(IMAGE_REGISTRY):$(ALPHA_VERSION)"; \
+	else \
+		echo "Error: No container runtime available"; \
+		exit 1; \
+	fi
+
+alpha-push:
+	@echo "Pushing alpha release image to registry..."
+	@RUNTIME=$$($(MAKE) detect-runtime 2>/dev/null); \
+	if [ -n "$$RUNTIME" ]; then \
+		echo "Pushing $(IMAGE_REGISTRY):$(ALPHA_VERSION)..."; \
+		$$RUNTIME push $(IMAGE_REGISTRY):$(ALPHA_VERSION); \
+		echo "Pushing $(IMAGE_REGISTRY):latest..."; \
+		$$RUNTIME push $(IMAGE_REGISTRY):latest; \
+		echo "✓ Pushed images to registry"; \
+	else \
+		echo "Error: No container runtime available"; \
+		exit 1; \
+	fi
+
+alpha-tag:
+	@echo "Creating git tag for alpha release..."
+	@if git tag -l | grep -q "^$(ALPHA_VERSION)$$"; then \
+		echo "Tag $(ALPHA_VERSION) already exists"; \
+	else \
+		git tag -a $(ALPHA_VERSION) -m "Alpha release $(ALPHA_VERSION)"; \
+		echo "✓ Created tag: $(ALPHA_VERSION)"; \
+	fi
+
+alpha-release: alpha-build alpha-push alpha-tag
+	@echo "✓ Alpha release $(ALPHA_VERSION) completed successfully!"
+	@echo ""
+	@echo "To deploy the alpha release:"
+	@echo "  IMAGE_TAG=$(ALPHA_VERSION) make minikube-deploy-registry"
+	@echo ""
+	@echo "To pull the alpha image:"
+	@echo "  docker pull $(IMAGE_REGISTRY):$(ALPHA_VERSION)"
