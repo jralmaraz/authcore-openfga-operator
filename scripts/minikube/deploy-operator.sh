@@ -15,8 +15,15 @@ NC='\033[0m' # No Color
 # Configuration
 OPERATOR_NAMESPACE="openfga-system"
 OPERATOR_IMAGE="openfga-operator:latest"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+
+# Retry configuration for shell compatibility
+# These values use seq command instead of bash brace expansions for POSIX compliance
+PODMAN_LOAD_RETRIES=2      # Number of retries for Podman image loading
+DOCKER_LOAD_RETRIES=3      # Number of retries for Docker image loading
+RETRY_DELAY=2              # Delay between Podman retries (seconds)
+DOCKER_RETRY_DELAY=5       # Delay between Docker retries (seconds)
 
 # Logging functions
 log_info() {
@@ -450,15 +457,16 @@ build_container_image() {
             log_info "Using Podman - attempting standard image load first..."
             
             # Try standard minikube image load first (faster if it works)
+            # Using seq command instead of brace expansion for POSIX shell compatibility
             local standard_load_success=false
-            for attempt in $(seq 1 2); do
+            for attempt in $(seq 1 $PODMAN_LOAD_RETRIES); do
                 if minikube image load openfga-operator:latest 2>/dev/null; then
                     log_success "Standard image load successful"
                     standard_load_success=true
                     break
                 else
-                    log_warning "Standard image load failed (attempt $attempt/2)"
-                    sleep 2
+                    log_warning "Standard image load failed (attempt $attempt/$PODMAN_LOAD_RETRIES)"
+                    sleep $RETRY_DELAY
                 fi
             done
             
@@ -472,14 +480,15 @@ build_container_image() {
             fi
         else
             # For Docker, use the existing retry logic
+            # Using seq command instead of brace expansion for POSIX shell compatibility
             log_info "Loading image into Minikube..."
-            for attempt in $(seq 1 3); do
+            for attempt in $(seq 1 $DOCKER_LOAD_RETRIES); do
                 if minikube image load openfga-operator:latest; then
                     log_success "Image loaded successfully into Minikube"
                     break
                 else
-                    log_warning "Failed to load image 'openfga-operator:latest', retrying in 5 seconds..."
-                    sleep 5
+                    log_warning "Failed to load image 'openfga-operator:latest', retrying in $DOCKER_RETRY_DELAY seconds..."
+                    sleep $DOCKER_RETRY_DELAY
                 fi
             done
         fi
@@ -911,6 +920,8 @@ main() {
     echo
     read -p "Do you want to deploy PostgreSQL example? (y/N): " -n 1 -r
     echo
+    # Using explicit string comparison instead of regex for POSIX shell compatibility
+    # Previously used double bracket syntax which requires bash
     if [ "$REPLY" = "y" ] || [ "$REPLY" = "Y" ]; then
         deploy_postgres_example
     fi
