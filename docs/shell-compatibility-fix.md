@@ -2,7 +2,7 @@
 
 ## Summary
 
-This document describes the changes made to improve shell compatibility of the `deploy-operator.sh` script by replacing bash-specific brace expansions with the more portable `seq` command.
+This document describes the changes made to improve shell compatibility of the `deploy-operator.sh` script by replacing bash-specific brace expansions with the more portable `seq` command and other POSIX-compliant constructs.
 
 ## Problem
 
@@ -44,11 +44,45 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
 if [ "$REPLY" = "y" ] || [ "$REPLY" = "Y" ]; then
 ```
 
+### 3. BASH_SOURCE Replacement for Better Portability
+
+**Before:**
+```bash
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+```
+
+**After:**
+```bash
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+```
+
 ## Locations Fixed
 
-1. **Line ~454**: Podman image load retry loop (2 attempts)
-2. **Line ~476**: Docker image load retry loop (3 attempts) 
-3. **Line ~914**: User input validation for PostgreSQL example deployment
+1. **Line ~460**: Podman image load retry loop (2 attempts)
+2. **Line ~483**: Docker image load retry loop (3 attempts) 
+3. **Line ~925**: User input validation for PostgreSQL example deployment
+4. **Line ~18**: Script directory detection using $0 instead of BASH_SOURCE
+
+## Improvements Added
+
+### 1. Configuration Variables for Better Maintainability
+```bash
+# Retry configuration for shell compatibility
+PODMAN_LOAD_RETRIES=2      # Number of retries for Podman image loading
+DOCKER_LOAD_RETRIES=3      # Number of retries for Docker image loading
+RETRY_DELAY=2              # Delay between Podman retries (seconds)
+DOCKER_RETRY_DELAY=5       # Delay between Docker retries (seconds)
+```
+
+### 2. Explanatory Comments
+- Added comments explaining why seq is used instead of brace expansions
+- Added comments explaining POSIX compliance considerations
+- Documented the reasoning behind specific changes for maintainability
+
+### 3. Enhanced Readability
+- Used descriptive variable names for retry counts and delays
+- Consistent formatting and spacing for better code readability
+- Clear separation between different retry strategies (Podman vs Docker)
 
 ## Testing
 
@@ -77,7 +111,9 @@ Two comprehensive test scripts were added to validate the changes:
 2. **Better Distribution Support**: Compatible with systems using dash as /bin/sh
 3. **Container Environment Friendly**: Works in minimal containers that may not include bash
 4. **Maintainability**: Uses standard POSIX constructs that are widely supported
+5. **Enhanced Readability**: Configuration variables make retry behavior more transparent
+6. **Better Documentation**: Comments explain the reasoning behind shell compatibility changes
 
 ## Backward Compatibility
 
-All changes are fully backward compatible. The script continues to work exactly as before in bash environments while now also supporting other shells.
+All changes are fully backward compatible. The script continues to work exactly as before in bash environments while now also supporting other shells. The addition of configuration variables makes the script more maintainable without changing its behavior.
