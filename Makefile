@@ -11,7 +11,29 @@ ALPHA_VERSION ?= v0.1.0-alpha
 # Usage: $(call generate-deployment-yaml,image-name,image-pull-policy,temp-file)
 define generate-deployment-yaml
 	@echo "Creating deployment YAML..."
-	@printf 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: openfga-operator\n  namespace: openfga-system\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: openfga-operator\n  template:\n    metadata:\n      labels:\n        app: openfga-operator\n    spec:\n      containers:\n      - name: operator\n        image: $(1)\n        imagePullPolicy: $(2)\n        ports:\n        - containerPort: 8080\n' > $(3)
+	@{ \
+		echo "apiVersion: apps/v1"; \
+		echo "kind: Deployment"; \
+		echo "metadata:"; \
+		echo "  name: openfga-operator"; \
+		echo "  namespace: openfga-system"; \
+		echo "spec:"; \
+		echo "  replicas: 1"; \
+		echo "  selector:"; \
+		echo "    matchLabels:"; \
+		echo "      app: openfga-operator"; \
+		echo "  template:"; \
+		echo "    metadata:"; \
+		echo "      labels:"; \
+		echo "        app: openfga-operator"; \
+		echo "    spec:"; \
+		echo "      containers:"; \
+		echo "      - name: operator"; \
+		echo "        image: $(1)"; \
+		echo "        imagePullPolicy: $(2)"; \
+		echo "        ports:"; \
+		echo "        - containerPort: 8080"; \
+	} > $(3)
 endef
 
 # Default target
