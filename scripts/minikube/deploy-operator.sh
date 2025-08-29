@@ -875,8 +875,59 @@ print_next_steps() {
     echo "For more information, see the documentation in docs/minikube/"
 }
 
+# Show usage information
+show_usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Automated deployment of authcore-openfga-operator to Minikube"
+    echo ""
+    echo "Options:"
+    echo "  --image-tag TAG    Specify the image tag to use (default: latest)"
+    echo "  --skip-postgres    Skip the PostgreSQL example deployment prompt"
+    echo "  -h, --help         Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0                        # Deploy with default settings"
+    echo "  $0 --image-tag v0.1.0     # Deploy with specific image tag"
+    echo "  $0 --skip-postgres        # Deploy without PostgreSQL example prompt"
+}
+
 # Main function
 main() {
+    # Parse command line arguments
+    local custom_tag=""
+    local skip_postgres=false
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --image-tag)
+                custom_tag="$2"
+                shift 2
+                ;;
+            --skip-postgres)
+                skip_postgres=true
+                shift
+                ;;
+            -h|--help)
+                show_usage
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                show_usage
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Set image tag based on argument or use default
+    if [ -n "$custom_tag" ]; then
+        OPERATOR_IMAGE="openfga-operator:$custom_tag"
+        log_info "Using custom image tag: $custom_tag"
+    else
+        log_info "Using default image tag: latest"
+    fi
+    
     echo "=================================================="
     echo "  authcore-openfga-operator Deployment to Minikube"
     echo "=================================================="
@@ -916,14 +967,16 @@ main() {
     # Deploy example instances
     deploy_examples
     
-    # Ask user if they want to deploy PostgreSQL example
-    echo
-    read -p "Do you want to deploy PostgreSQL example? (y/N): " -n 1 -r
-    echo
-    # Using explicit string comparison instead of regex for POSIX shell compatibility
-    # Previously used double bracket syntax which requires bash
-    if [ "$REPLY" = "y" ] || [ "$REPLY" = "Y" ]; then
-        deploy_postgres_example
+    # Ask user if they want to deploy PostgreSQL example (unless skipped)
+    if [ "$skip_postgres" = "false" ]; then
+        echo
+        read -p "Do you want to deploy PostgreSQL example? (y/N): " -n 1 -r
+        echo
+        # Using explicit string comparison instead of regex for POSIX shell compatibility
+        # Previously used double bracket syntax which requires bash
+        if [ "$REPLY" = "y" ] || [ "$REPLY" = "Y" ]; then
+            deploy_postgres_example
+        fi
     fi
     
     # Show deployment status

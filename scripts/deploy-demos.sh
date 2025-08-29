@@ -317,6 +317,7 @@ show_usage() {
     echo "Options:"
     echo "  --banking-only    Deploy only the banking demo"
     echo "  --genai-only      Deploy only the GenAI RAG demo"
+    echo "  --operator-tag TAG Specify the operator image tag to use (for validation)"
     echo "  --cleanup         Remove all demo deployments"
     echo "  --test-only       Only test existing deployments"
     echo "  --status          Show comprehensive status of all demos"
@@ -328,13 +329,14 @@ show_usage() {
     echo "  OPENAI_API_KEY    Optional: Your OpenAI API key for GenAI demo"
     echo
     echo "Examples:"
-    echo "  $0                      # Deploy both demos"
-    echo "  $0 --banking-only       # Deploy only banking demo"
-    echo "  $0 --genai-only         # Deploy only GenAI demo"
-    echo "  $0 --cleanup            # Remove all deployments"
-    echo "  $0 --test-only          # Test existing deployments"
-    echo "  $0 --status             # Show status of all demos"
-    echo "  $0 --skip-build         # Deploy without rebuilding"
+    echo "  $0                              # Deploy both demos"
+    echo "  $0 --banking-only               # Deploy only banking demo"
+    echo "  $0 --genai-only                 # Deploy only GenAI demo"
+    echo "  $0 --operator-tag v0.1.0        # Deploy with specific operator version validation"
+    echo "  $0 --cleanup                    # Remove all deployments"
+    echo "  $0 --test-only                  # Test existing deployments"
+    echo "  $0 --status                     # Show status of all demos"
+    echo "  $0 --skip-build                 # Deploy without rebuilding"
     echo
     echo "Individual Demo Scripts:"
     echo "  $SCRIPT_DIR/deploy-banking-demo.sh   # Banking demo only"
@@ -357,6 +359,7 @@ main() {
     local test_only=false
     local skip_build=false
     local show_status_only=false
+    local operator_tag=""
     
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -367,6 +370,10 @@ main() {
             --genai-only)
                 genai_only=true
                 shift
+                ;;
+            --operator-tag)
+                operator_tag="$2"
+                shift 2
                 ;;
             --cleanup)
                 cleanup_both_demos
@@ -395,6 +402,13 @@ main() {
                 ;;
         esac
     done
+    
+    # Set operator tag for validation if provided
+    if [ -n "$operator_tag" ]; then
+        log_info "Using operator tag for validation: $operator_tag"
+        # This can be used by validation functions to check specific operator versions
+        export OPERATOR_TAG="$operator_tag"
+    fi
     
     # Handle status-only request
     if [ "$show_status_only" = true ]; then
