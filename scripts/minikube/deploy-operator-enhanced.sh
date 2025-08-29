@@ -93,6 +93,7 @@ get_container_runtime() {
 }
 
 # Check prerequisites
+
 check_prerequisites() {
     log_info "Checking prerequisites..."
     
@@ -109,6 +110,16 @@ check_prerequisites() {
     if ! minikube status >/dev/null 2>&1; then
         log_error "Minikube is not running. Please start Minikube first: minikube start"
         exit 1
+    fi
+    
+    # Check for any container runtime (Docker or Podman)
+    local runtime
+    runtime=$(detect_container_runtime)
+    if [ -z "$runtime" ]; then
+        log_error "No container runtime (Docker or Podman) is installed. Please install Docker or Podman for local builds."
+        log_info "Note: Registry-based deployment does not require a local container runtime."
+    else
+        log_info "Using container runtime: $runtime"
     fi
     
     log_success "All prerequisites satisfied"
@@ -144,6 +155,7 @@ show_usage() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
     echo "Consolidated Minikube deployment script with registry and local build support"
+    echo "Supports both Docker and Podman as container runtimes"
     echo ""
     echo "Options:"
     echo "  --image-tag TAG        Specify the image tag to deploy"
@@ -157,6 +169,9 @@ show_usage() {
     echo "  --local-deploy         Deploy using local build directly (non-interactive)"
     echo "  --alpha                Use alpha tag ($ALPHA_TAG) for registry deployment"
     echo "  -h, --help             Show this help message"
+    echo ""
+    echo "Environment Variables:"
+    echo "  CONTAINER_RUNTIME  Specify container runtime (docker|podman)"
     echo ""
     echo "Examples:"
     echo "  $0                                          # Interactive mode with default settings"
@@ -193,7 +208,7 @@ deploy_registry_based() {
             log_warning "Could not pre-verify image, but deployment will attempt to pull it"
         fi
     else
-        log_warning "No container runtime available for image verification"
+        log_warning "No container runtime available for image verification, but deployment will attempt to pull it"
     fi
     
     # Deploy using Makefile
@@ -212,17 +227,19 @@ deploy_registry_based() {
 deploy_local_build() {
     log_info "Starting local build deployment..."
     
-    # Get container runtime
+    # Check if any container runtime is available
     local runtime
-    runtime=$(get_container_runtime)
+    runtime=$(detect_container_runtime)
+    if [ -z "$runtime" ]; then
+        log_error "No container runtime (Docker or Podman) is available. Local build requires a container runtime."
+        return 1
+    fi
+    
     log_info "Using container runtime: $runtime"
     
-    # Export container runtime for Makefile
-    export CONTAINER_RUNTIME="$runtime"
-    
-    # Build and deploy using Makefile
+    # Build and deploy using Makefile (which supports both Docker and Podman)
     log_info "Building and deploying operator to Minikube..."
-    if make minikube-setup-and-deploy-local; then
+    if CONTAINER_RUNTIME="$runtime" make minikube-setup-and-deploy-local; then
         log_success "Local build deployment completed successfully!"
         show_success_info "$LOCAL_IMAGE"
         return 0
