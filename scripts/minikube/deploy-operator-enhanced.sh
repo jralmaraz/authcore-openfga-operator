@@ -78,6 +78,26 @@ show_deployment_options() {
     echo ""
 }
 
+show_usage() {
+    echo "Usage: $0 [OPTIONS]"
+    echo ""
+    echo "Enhanced Minikube deployment script with registry support"
+    echo ""
+    echo "Options:"
+    echo "  --image-tag TAG    Specify the image tag to deploy (default: latest)"
+    echo "  --registry URL     Specify the image registry (default: $DEFAULT_REGISTRY)"
+    echo "  --interactive      Run in interactive mode (default behavior)"
+    echo "  --registry-deploy  Deploy using registry image directly (non-interactive)"
+    echo "  --local-deploy     Deploy using local build directly (non-interactive)"
+    echo "  -h, --help         Show this help message"
+    echo ""
+    echo "Examples:"
+    echo "  $0                                    # Interactive mode with default settings"
+    echo "  $0 --image-tag v0.1.0-alpha          # Interactive mode with specific tag"
+    echo "  $0 --registry-deploy --image-tag v1.0 # Direct registry deployment with specific tag"
+    echo "  $0 --local-deploy                     # Direct local deployment"
+}
+
 deploy_registry_based() {
     local registry="${IMAGE_REGISTRY:-$DEFAULT_REGISTRY}"
     local tag="${IMAGE_TAG:-$DEFAULT_TAG}"
@@ -151,8 +171,94 @@ show_success_info() {
 }
 
 main() {
+    # Parse command line arguments
+    local interactive_mode=true
+    local deployment_mode=""
+    local custom_registry=""
+    local custom_tag=""
+    
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+            --image-tag)
+                custom_tag="$2"
+                shift 2
+                ;;
+            --registry)
+                custom_registry="$2"
+                shift 2
+                ;;
+            --interactive)
+                interactive_mode=true
+                shift
+                ;;
+            --registry-deploy)
+                interactive_mode=false
+                deployment_mode="registry"
+                shift
+                ;;
+            --local-deploy)
+                interactive_mode=false
+                deployment_mode="local"
+                shift
+                ;;
+            -h|--help)
+                show_usage
+                exit 0
+                ;;
+            *)
+                log_error "Unknown option: $1"
+                show_usage
+                exit 1
+                ;;
+        esac
+    done
+    
+    # Set image registry and tag based on arguments or environment variables
+    if [ -n "$custom_registry" ]; then
+        IMAGE_REGISTRY="$custom_registry"
+    elif [ -z "${IMAGE_REGISTRY:-}" ]; then
+        IMAGE_REGISTRY="$DEFAULT_REGISTRY"
+    fi
+    
+    if [ -n "$custom_tag" ]; then
+        IMAGE_TAG="$custom_tag"
+    elif [ -z "${IMAGE_TAG:-}" ]; then
+        IMAGE_TAG="$DEFAULT_TAG"
+    fi
+    
+    export IMAGE_REGISTRY IMAGE_TAG
+    
+    log_info "Using image registry: $IMAGE_REGISTRY"
+    log_info "Using image tag: $IMAGE_TAG"
+    
     check_prerequisites
     
+    # Handle non-interactive mode
+    if [ "$interactive_mode" = "false" ]; then
+        case "$deployment_mode" in
+            registry)
+                log_info "Starting registry-based deployment..."
+                if deploy_registry_based; then
+                    log_success "Deployment completed successfully!"
+                else
+                    log_error "Deployment failed!"
+                    exit 1
+                fi
+                ;;
+            local)
+                log_info "Starting local build deployment..."
+                if deploy_local_build; then
+                    log_success "Deployment completed successfully!"
+                else
+                    log_error "Deployment failed!"
+                    exit 1
+                fi
+                ;;
+        esac
+        return 0
+    fi
+    
+    # Interactive mode
     while true; do
         show_deployment_options
         read -p "Enter your choice (1-3): " choice

@@ -375,18 +375,20 @@ show_usage() {
     echo "Deploy the Banking Demo Application for local testing"
     echo
     echo "Options:"
-    echo "  --cleanup         Remove the banking demo deployment"
-    echo "  --test-only       Only test an existing deployment"
-    echo "  --skip-build      Skip building the application and Docker image"
-    echo "  --help           Show this help message"
+    echo "  --operator-tag TAG   Specify the operator image tag for validation"
+    echo "  --cleanup            Remove the banking demo deployment"
+    echo "  --test-only          Only test an existing deployment"
+    echo "  --skip-build         Skip building the application and Docker image"
+    echo "  --help              Show this help message"
     echo
     echo "Environment Variables:"
     echo "  CONTAINER_RUNTIME  Specify container runtime (docker|podman)"
     echo
     echo "Examples:"
-    echo "  $0                    # Deploy the banking demo"
-    echo "  $0 --cleanup          # Remove the banking demo"
-    echo "  $0 --test-only        # Test existing deployment"
+    echo "  $0                       # Deploy the banking demo"
+    echo "  $0 --operator-tag v1.0   # Deploy with specific operator version validation"
+    echo "  $0 --cleanup             # Remove the banking demo"
+    echo "  $0 --test-only           # Test existing deployment"
     echo "  CONTAINER_RUNTIME=podman $0  # Use Podman instead of Docker"
 }
 
@@ -400,9 +402,14 @@ main() {
     # Parse command line arguments
     local skip_build=false
     local test_only=false
+    local operator_tag=""
     
     while [[ $# -gt 0 ]]; do
         case $1 in
+            --operator-tag)
+                operator_tag="$2"
+                shift 2
+                ;;
             --cleanup)
                 cleanup
                 exit 0
@@ -426,6 +433,12 @@ main() {
                 ;;
         esac
     done
+    
+    # Set operator tag for validation if provided
+    if [ -n "$operator_tag" ]; then
+        log_info "Using operator tag for validation: $operator_tag"
+        export OPERATOR_TAG="$operator_tag"
+    fi
     
     if [ "$test_only" = true ]; then
         check_prerequisites
