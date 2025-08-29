@@ -40,10 +40,10 @@ The new approach uses GitHub Container Registry (GHCR) to store and distribute p
 
 ### Quick Start (Recommended)
 
-Use the enhanced deployment script for an interactive experience:
+Use the consolidated deployment script for an interactive experience:
 
 ```bash
-./scripts/minikube/deploy-operator-enhanced.sh
+./scripts/minikube/deploy-operator.sh
 ```
 
 ### Registry-Based Deployment (Recommended)

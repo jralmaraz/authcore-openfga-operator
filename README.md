@@ -112,22 +112,42 @@ For local development and testing, use our comprehensive Minikube guides:
 
 #### Automated Setup Scripts
 
-For reliable deployment, we now recommend using our enhanced deployment script with GitHub Container Registry integration:
+For reliable deployment, we recommend using our consolidated deployment script with comprehensive container runtime support:
 
 ```bash
-# Enhanced deployment script (recommended)
-./scripts/minikube/deploy-operator-enhanced.sh
+# Consolidated deployment script (recommended)
+./scripts/minikube/deploy-operator.sh
 ```
 
 This interactive script offers:
 - **Registry-based deployment** (recommended): Uses pre-built images from GitHub Container Registry
-- **Local build deployment**: Builds images locally for development
-- **Automatic fallback**: Tries alternative methods if the first one fails
+- **Local build deployment**: Builds images locally for development with Docker/Podman support
+- **Container runtime auto-detection**: Supports both Docker and Podman
+- **Alpha and latest image tags**: Supports both `latest` and `0.1.0-alpha` image tags
+- **Interactive and non-interactive modes**: Flexible deployment options
 - **Comprehensive validation**: Ensures successful deployment
 
-#### Legacy Scripts (Manual Choice)
+#### Non-Interactive Deployment Options
 
-For manual control over deployment method:
+For automated or CI/CD deployment:
+
+```bash
+# Registry-based deployment with latest tag
+./scripts/minikube/deploy-operator.sh --registry-deploy
+
+# Registry-based deployment with alpha tag
+./scripts/minikube/deploy-operator.sh --registry-deploy --alpha
+
+# Local build deployment with specific container runtime
+./scripts/minikube/deploy-operator.sh --local-deploy --container-runtime podman
+
+# Custom registry and tag
+./scripts/minikube/deploy-operator.sh --registry-deploy --registry your-registry.com/operator --image-tag v1.0.0
+```
+
+#### Manual Makefile Targets
+
+For direct control over deployment method:
 
 ```bash
 # Registry-based deployment (recommended for reliability)
@@ -146,13 +166,13 @@ make minikube-validate
 # Linux/macOS - Setup Minikube first
 ./scripts/minikube/setup-minikube.sh
 
-# Then deploy using enhanced script
-./scripts/minikube/deploy-operator-enhanced.sh
+# Then deploy using consolidated script
+./scripts/minikube/deploy-operator.sh
 
-# Or deploy manually
-make minikube-setup-and-deploy-registry  # Recommended
+# Or deploy manually with environment variables
+IMAGE_TAG=0.1.0-alpha make minikube-setup-and-deploy-registry  # Alpha release
 # OR
-make minikube-setup-and-deploy-local     # For development
+CONTAINER_RUNTIME=podman make minikube-setup-and-deploy-local   # Local with Podman
 
 # Validate deployment
 ./scripts/minikube/validate-deployment.sh
