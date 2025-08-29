@@ -256,13 +256,19 @@ minikube-deploy-registry: install-crds
 	@echo "Deploying to Minikube using registry image..."
 	@echo "Using image: $(IMAGE_REGISTRY):$(IMAGE_TAG)"
 	kubectl create namespace openfga-system --dry-run=client -o yaml | kubectl apply -f -
-	kubectl apply -f - <<< 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: openfga-operator\n  namespace: openfga-system\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: openfga-operator\n  template:\n    metadata:\n      labels:\n        app: openfga-operator\n    spec:\n      containers:\n      - name: operator\n        image: $(IMAGE_REGISTRY):$(IMAGE_TAG)\n        imagePullPolicy: Always\n        ports:\n        - containerPort: 8080'
+	@echo "Creating deployment YAML..."
+	@printf 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: openfga-operator\n  namespace: openfga-system\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: openfga-operator\n  template:\n    metadata:\n      labels:\n        app: openfga-operator\n    spec:\n      containers:\n      - name: operator\n        image: $(IMAGE_REGISTRY):$(IMAGE_TAG)\n        imagePullPolicy: Always\n        ports:\n        - containerPort: 8080\n' > /tmp/openfga-operator-deployment.yaml
+	kubectl apply -f /tmp/openfga-operator-deployment.yaml
+	@rm -f /tmp/openfga-operator-deployment.yaml
 
 # Deploy to Minikube using local image (requires image to be built and loaded)
 minikube-deploy-local: minikube-build install-crds
 	@echo "Deploying to Minikube using local image..."
 	kubectl create namespace openfga-system --dry-run=client -o yaml | kubectl apply -f -
-	kubectl apply -f - <<< 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: openfga-operator\n  namespace: openfga-system\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: openfga-operator\n  template:\n    metadata:\n      labels:\n        app: openfga-operator\n    spec:\n      containers:\n      - name: operator\n        image: $(LOCAL_IMAGE_NAME)\n        imagePullPolicy: Never\n        ports:\n        - containerPort: 8080'
+	@echo "Creating deployment YAML..."
+	@printf 'apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: openfga-operator\n  namespace: openfga-system\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: openfga-operator\n  template:\n    metadata:\n      labels:\n        app: openfga-operator\n    spec:\n      containers:\n      - name: operator\n        image: $(LOCAL_IMAGE_NAME)\n        imagePullPolicy: Never\n        ports:\n        - containerPort: 8080\n' > /tmp/openfga-operator-deployment.yaml
+	kubectl apply -f /tmp/openfga-operator-deployment.yaml
+	@rm -f /tmp/openfga-operator-deployment.yaml
 
 # Deploy to Minikube (legacy - uses local build)
 minikube-deploy: minikube-deploy-local
