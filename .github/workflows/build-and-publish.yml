@@ -54,7 +54,6 @@ jobs:
             type=semver,pattern={{major}}
             type=sha,prefix={{branch}}-,enable={{is_default_branch}}
             type=sha,prefix=pr-{{number}}-,enable=${{ github.event_name == 'pull_request' }}
-            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build container image (status check)
         uses: docker/build-push-action@v5
@@ -100,7 +99,7 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest
 
       - name: Build and push container image
         uses: docker/build-push-action@v5

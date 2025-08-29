@@ -121,9 +121,9 @@ The `.github/workflows/build-and-publish.yml` workflow automatically:
 
 | Trigger | Tag Format | Example |
 |---------|------------|---------|
-| Push to main | `latest` | `ghcr.io/jralmaraz/authcore-openfga-operator:latest` |
+| Push to main | `main` | `ghcr.io/jralmaraz/authcore-openfga-operator:main` |
 | Push to develop | `develop` | `ghcr.io/jralmaraz/authcore-openfga-operator:develop` |
-| Git tag | `v1.0.0`, `v1.0`, `v1` | `ghcr.io/jralmaraz/authcore-openfga-operator:v1.0.0` |
+| Git tag | `v1.0.0`, `v1.0`, `v1`, `latest` | `ghcr.io/jralmaraz/authcore-openfga-operator:v1.0.0` |
 | Pull request | `pr-123` | `ghcr.io/jralmaraz/authcore-openfga-operator:pr-123` |
 
 ## Troubleshooting
