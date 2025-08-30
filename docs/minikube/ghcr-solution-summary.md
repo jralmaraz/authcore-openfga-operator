@@ -39,9 +39,12 @@ After:  GitHub Actions → GHCR → Minikube Pull → Deploy
    - `minikube-deploy-local`: Local build for development
    - Environment variable configuration for flexibility
 
-3. **Interactive Deployment Script** (`scripts/minikube/deploy-operator-enhanced.sh`)
+3. **Consolidated Deployment Script** (`scripts/minikube/deploy-operator.sh`)
    - User-friendly menu for deployment method selection
-   - Automatic fallback between registry and local methods
+   - Supports both Docker and Podman container runtimes
+   - Interactive and non-interactive modes
+   - Registry-based and local build deployment options
+   - Automatic fallback between deployment methods
    - Comprehensive error handling and troubleshooting
 
 4. **Updated Configurations**
@@ -62,7 +65,7 @@ After:  GitHub Actions → GHCR → Minikube Pull → Deploy
 ### Recommended Approach (Registry-based)
 ```bash
 # Interactive deployment
-./scripts/minikube/deploy-operator-enhanced.sh
+./scripts/minikube/deploy-operator.sh
 
 # Or directly
 make minikube-deploy-registry
