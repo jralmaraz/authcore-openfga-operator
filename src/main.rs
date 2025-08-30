@@ -54,7 +54,7 @@ type SharedHealthStatus = Arc<RwLock<HealthStatus>>;
 async fn main() -> Result<()> {
     // Initialize structured logging based on environment
     let json_logging = env::var("OPENFGA_LOG_FORMAT").unwrap_or_default() == "json";
-    
+
     let env_filter = EnvFilter::from_default_env()
         .add_directive(Level::INFO.into())
         .add_directive("openfga_operator=debug".parse().unwrap());
@@ -82,7 +82,7 @@ async fn main() -> Result<()> {
 
     // Initialize shared health status
     let health_status = Arc::new(RwLock::new(HealthStatus::default()));
-    
+
     // Start health endpoint
     let health_task = start_health_endpoint(health_status.clone());
 
@@ -91,10 +91,10 @@ async fn main() -> Result<()> {
 
     // Initialize operator with retry logic
     let operator_result = initialize_operator_with_retry(health_status.clone()).await;
-    
+
     // Clean shutdown
     health_task.abort();
-    
+
     match operator_result {
         Ok(()) => {
             info!("OpenFGA Operator shutdown completed successfully");
@@ -114,7 +114,7 @@ async fn main() -> Result<()> {
 fn start_health_endpoint(health_status: SharedHealthStatus) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
-        
+
         let make_svc = make_service_fn(move |_conn| {
             let health_status = health_status.clone();
             async move {
@@ -125,7 +125,7 @@ fn start_health_endpoint(health_status: SharedHealthStatus) -> tokio::task::Join
         });
 
         let server = Server::bind(&addr).serve(make_svc);
-        
+
         info!(
             endpoint = "health",
             address = %addr,
@@ -156,14 +156,14 @@ async fn handle_health_request(
                 "version": env!("CARGO_PKG_VERSION"),
                 "timestamp": chrono::Utc::now().to_rfc3339()
             });
-            
+
             let is_healthy = status.kubernetes_connected && status.controller_running;
             let status_code = if is_healthy {
                 StatusCode::OK
             } else {
                 StatusCode::SERVICE_UNAVAILABLE
             };
-            
+
             Ok(Response::builder()
                 .status(status_code)
                 .header("content-type", "application/json")
@@ -178,32 +178,28 @@ async fn handle_health_request(
             } else {
                 StatusCode::SERVICE_UNAVAILABLE
             };
-            
+
             Ok(Response::builder()
                 .status(status_code)
                 .header("content-type", "text/plain")
                 .body(Body::from(if is_ready { "ready" } else { "not ready" }))
                 .unwrap())
         }
-        "/live" | "/liveness" => {
-            Ok(Response::builder()
-                .status(StatusCode::OK)
-                .header("content-type", "text/plain")
-                .body(Body::from("alive"))
-                .unwrap())
-        }
-        _ => {
-            Ok(Response::builder()
-                .status(StatusCode::NOT_FOUND)
-                .body(Body::from("Not Found"))
-                .unwrap())
-        }
+        "/live" | "/liveness" => Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header("content-type", "text/plain")
+            .body(Body::from("alive"))
+            .unwrap()),
+        _ => Ok(Response::builder()
+            .status(StatusCode::NOT_FOUND)
+            .body(Body::from("Not Found"))
+            .unwrap()),
     }
 }
 
 async fn setup_signal_handler() -> tokio::sync::broadcast::Receiver<()> {
     let (shutdown_tx, shutdown_rx) = tokio::sync::broadcast::channel(1);
-    
+
     tokio::spawn(async move {
         let mut sigterm = signal::unix::signal(signal::unix::SignalKind::terminate())
             .expect("Failed to install SIGTERM handler");
@@ -218,10 +214,10 @@ async fn setup_signal_handler() -> tokio::sync::broadcast::Receiver<()> {
                 info!(signal = "SIGINT", "Received shutdown signal");
             }
         }
-        
+
         let _ = shutdown_tx.send(());
     });
-    
+
     shutdown_rx
 }
 
@@ -230,11 +226,11 @@ async fn initialize_operator_with_retry(health_status: SharedHealthStatus) -> Re
     let base_delay = Duration::from_secs(5);
     let max_delay = Duration::from_secs(300); // 5 minutes max
     let start_time = std::time::Instant::now();
-    
+
     // Start health reporting
     let mut health_interval = interval(Duration::from_secs(30));
     let mut retry_count = 0;
-    
+
     info!(
         max_attempts = max_retry_attempts,
         base_delay_seconds = base_delay.as_secs(),
@@ -269,27 +265,27 @@ async fn initialize_operator_with_retry(health_status: SharedHealthStatus) -> Re
                             retry_attempt = retry_count,
                             "Successfully connected to Kubernetes API, starting controller"
                         );
-                        
+
                         // Update health status
                         {
                             let mut status = health_status.write().await;
                             status.status = "running".to_string();
                             status.kubernetes_connected = true;
                         }
-                        
+
                         // Start the main controller loop
                         return run_controller_with_health_monitoring(client, health_status).await;
                     }
                     Err(e) => {
                         retry_count += 1;
-                        
+
                         // Update health status
                         {
                             let mut status = health_status.write().await;
                             status.status = format!("retrying (attempt {})", retry_count);
                             status.kubernetes_connected = false;
                         }
-                        
+
                         if retry_count >= max_retry_attempts {
                             error!(
                                 error = %e,
@@ -297,22 +293,22 @@ async fn initialize_operator_with_retry(health_status: SharedHealthStatus) -> Re
                                 max_attempts = max_retry_attempts,
                                 "Exhausted all retry attempts to connect to Kubernetes API"
                             );
-                            
+
                             // Update health status to failed
                             {
                                 let mut status = health_status.write().await;
                                 status.status = "failed".to_string();
                             }
-                            
+
                             return Err(e.into());
                         }
-                        
+
                         // Calculate exponential backoff delay
                         let delay = std::cmp::min(
                             base_delay * 2_u32.pow((retry_count - 1) as u32),
                             max_delay
                         );
-                        
+
                         warn!(
                             error = %e,
                             retry_attempt = retry_count,
@@ -320,7 +316,7 @@ async fn initialize_operator_with_retry(health_status: SharedHealthStatus) -> Re
                             retry_delay_seconds = delay.as_secs(),
                             "Failed to connect to Kubernetes API, retrying with exponential backoff"
                         );
-                        
+
                         sleep(delay).await;
                     }
                 }
@@ -334,30 +330,33 @@ async fn attempt_kubernetes_connection() -> Result<Client, kube::Error> {
     Client::try_default().await
 }
 
-async fn run_controller_with_health_monitoring(client: Client, health_status: SharedHealthStatus) -> Result<()> {
+async fn run_controller_with_health_monitoring(
+    client: Client,
+    health_status: SharedHealthStatus,
+) -> Result<()> {
     // Create controller
     debug!("Initializing OpenFGA controller");
     let controller = OpenFGAController::new(client);
-    
+
     // Update health status
     {
         let mut status = health_status.write().await;
         status.controller_running = true;
     }
-    
+
     // Start health monitoring
     let health_task = {
         let health_status = health_status.clone();
         tokio::spawn(async move {
             let mut health_interval = interval(Duration::from_secs(60));
             let start_time = std::time::Instant::now();
-            
+
             loop {
                 health_interval.tick().await;
-                
+
                 let mut status = health_status.write().await;
                 status.uptime_seconds = start_time.elapsed().as_secs();
-                
+
                 info!(
                     operator_status = %status.status,
                     controller_status = "active",
@@ -367,20 +366,20 @@ async fn run_controller_with_health_monitoring(client: Client, health_status: Sh
             }
         })
     };
-    
+
     info!("Starting OpenFGA controller reconciliation loop");
-    
+
     // Run controller with proper error handling
     tokio::select! {
         result = controller.run() => {
             health_task.abort();
-            
+
             // Update health status
             {
                 let mut status = health_status.write().await;
                 status.controller_running = false;
             }
-            
+
             match result {
                 Ok(_) => {
                     info!("OpenFGA controller completed successfully");
@@ -391,13 +390,13 @@ async fn run_controller_with_health_monitoring(client: Client, health_status: Sh
                         error = %e,
                         "OpenFGA controller failed"
                     );
-                    
+
                     // Update health status to failed
                     {
                         let mut status = health_status.write().await;
                         status.status = "controller_failed".to_string();
                     }
-                    
+
                     Err(e)
                 }
             }
@@ -405,14 +404,14 @@ async fn run_controller_with_health_monitoring(client: Client, health_status: Sh
         _ = signal::ctrl_c() => {
             info!("Received interrupt signal, shutting down gracefully");
             health_task.abort();
-            
+
             // Update health status
             {
                 let mut status = health_status.write().await;
                 status.status = "shutting_down".to_string();
                 status.controller_running = false;
             }
-            
+
             Ok(())
         }
     }

@@ -27,9 +27,9 @@ fn test_logging_environment_variables() {
 fn test_structured_logging_compatibility() {
     // This test ensures that our structured logging approach compiles and doesn't panic
     // We can't easily test the actual log output in unit tests, but we can verify the code compiles
-    
-    use tracing::{info, debug, error};
-    
+
+    use tracing::{debug, error, info};
+
     // Test info level structured logging (like in main.rs)
     info!(
         operator = "test-operator",

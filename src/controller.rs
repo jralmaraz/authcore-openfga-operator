@@ -46,7 +46,7 @@ impl OpenFGAController {
             controller = "openfga-controller",
             "Starting controller with resource monitoring"
         );
-        
+
         debug!(
             resources = "OpenFGA, Deployment, Service",
             "Controller watching resources"
@@ -99,10 +99,10 @@ impl OpenFGAController {
 
     async fn test_api_connectivity(&self) -> Result<(), kube::Error> {
         debug!("Testing Kubernetes API connectivity");
-        
+
         // Try to list namespaces as a basic connectivity test
         let namespaces: Api<k8s_openapi::api::core::v1::Namespace> = Api::all(self.client.clone());
-        
+
         match namespaces.list(&Default::default()).await {
             Ok(namespace_list) => {
                 info!(
@@ -155,7 +155,7 @@ async fn reconcile(openfga: Arc<OpenFGA>, ctx: Arc<OpenFGAController>) -> Contro
         resource_name = %name,
         "Starting deployment reconciliation"
     );
-    
+
     let deployment = create_deployment(&openfga, &ns, &name)?;
     let deployments: Api<Deployment> = Api::namespaced(client.clone(), &ns);
 
@@ -168,14 +168,14 @@ async fn reconcile(openfga: Arc<OpenFGA>, ctx: Arc<OpenFGAController>) -> Contro
                 current_replicas = existing_deployment.spec.as_ref().and_then(|s| s.replicas),
                 "Existing deployment found, updating"
             );
-            
+
             match deployments
                 .patch(
                     &name,
                     &PatchParams::apply("openfga-operator"),
                     &Patch::Apply(&deployment),
                 )
-                .await 
+                .await
             {
                 Ok(_) => {
                     info!(
@@ -206,14 +206,14 @@ async fn reconcile(openfga: Arc<OpenFGA>, ctx: Arc<OpenFGAController>) -> Contro
                 error = %e,
                 "Deployment not found, creating new deployment"
             );
-            
+
             match deployments
                 .patch(
                     &name,
                     &PatchParams::apply("openfga-operator"),
                     &Patch::Apply(&deployment),
                 )
-                .await 
+                .await
             {
                 Ok(_) => {
                     info!(
@@ -245,7 +245,7 @@ async fn reconcile(openfga: Arc<OpenFGA>, ctx: Arc<OpenFGAController>) -> Contro
         resource_name = %name,
         "Starting service reconciliation"
     );
-    
+
     let service = create_service(&openfga, &ns, &name)?;
     let services: Api<Service> = Api::namespaced(client.clone(), &ns);
 
@@ -258,14 +258,14 @@ async fn reconcile(openfga: Arc<OpenFGA>, ctx: Arc<OpenFGAController>) -> Contro
                 current_type = existing_service.spec.as_ref().and_then(|s| s.type_.as_ref()),
                 "Existing service found, updating"
             );
-            
+
             match services
                 .patch(
                     &name,
                     &PatchParams::apply("openfga-operator"),
                     &Patch::Apply(&service),
                 )
-                .await 
+                .await
             {
                 Ok(_) => {
                     info!(
@@ -296,14 +296,14 @@ async fn reconcile(openfga: Arc<OpenFGA>, ctx: Arc<OpenFGAController>) -> Contro
                 error = %e,
                 "Service not found, creating new service"
             );
-            
+
             match services
                 .patch(
                     &name,
                     &PatchParams::apply("openfga-operator"),
                     &Patch::Apply(&service),
                 )
-                .await 
+                .await
             {
                 Ok(_) => {
                     info!(
@@ -335,7 +335,7 @@ async fn reconcile(openfga: Arc<OpenFGA>, ctx: Arc<OpenFGAController>) -> Contro
         resource_name = %name,
         "Starting status update"
     );
-    
+
     match update_status(client, &openfga, &ns, &name).await {
         Ok(_) => {
             debug!(
@@ -379,7 +379,7 @@ fn create_deployment(openfga: &OpenFGA, ns: &str, name: &str) -> ControllerResul
         replicas = openfga.spec.replicas,
         "Creating deployment specification"
     );
-    
+
     let labels = BTreeMap::from([
         ("app".to_string(), "openfga".to_string()),
         ("instance".to_string(), name.to_string()),
@@ -408,7 +408,7 @@ fn create_deployment(openfga: &OpenFGA, ns: &str, name: &str) -> ControllerResul
             playground_port = openfga.spec.playground.port,
             "Adding playground port to deployment"
         );
-        
+
         container_ports.push(ContainerPort {
             container_port: openfga.spec.playground.port,
             name: Some("playground".to_string()),
@@ -478,7 +478,7 @@ fn create_service(openfga: &OpenFGA, ns: &str, name: &str) -> ControllerResult<S
         playground_enabled = openfga.spec.playground.enabled,
         "Creating service specification"
     );
-    
+
     let labels = BTreeMap::from([
         ("app".to_string(), "openfga".to_string()),
         ("instance".to_string(), name.to_string()),
@@ -509,7 +509,7 @@ fn create_service(openfga: &OpenFGA, ns: &str, name: &str) -> ControllerResult<S
             playground_port = openfga.spec.playground.port,
             "Adding playground port to service"
         );
-        
+
         service_ports.push(ServicePort {
             port: openfga.spec.playground.port,
             target_port: Some(IntOrString::Int(openfga.spec.playground.port)),
@@ -560,14 +560,14 @@ async fn update_status(
         name = %name,
         "Starting status update process"
     );
-    
+
     let deployments: Api<Deployment> = Api::namespaced(client.clone(), ns);
 
     match deployments.get(name).await {
         Ok(deployment) => {
             let current_replicas = deployment.status.as_ref().and_then(|s| s.replicas);
             let ready_replicas = deployment.status.as_ref().and_then(|s| s.ready_replicas);
-            
+
             debug!(
                 event = "deployment_status_retrieved",
                 namespace = %ns,
@@ -576,7 +576,7 @@ async fn update_status(
                 ready_replicas = ready_replicas,
                 "Retrieved deployment status"
             );
-            
+
             let status = OpenFGAStatus {
                 replicas: current_replicas,
                 ready_replicas,
@@ -590,7 +590,7 @@ async fn update_status(
 
             match openfgas
                 .patch_status(name, &PatchParams::default(), &Patch::Merge(&status_patch))
-                .await 
+                .await
             {
                 Ok(_) => {
                     debug!(
@@ -636,7 +636,7 @@ fn error_policy(
 ) -> Action {
     let ns = openfga.namespace().unwrap_or_default();
     let name = openfga.name_any();
-    
+
     let requeue_duration = match error {
         ControllerError::Kube(kube_error) => {
             // More intelligent error handling based on kube-rs patterns
@@ -656,7 +656,9 @@ fn error_policy(
                     "Resource conflict, immediate retry"
                 );
                 Duration::from_secs(1)
-            } else if kube_error.to_string().contains("Forbidden") || kube_error.to_string().contains("Unauthorized") {
+            } else if kube_error.to_string().contains("Forbidden")
+                || kube_error.to_string().contains("Unauthorized")
+            {
                 warn!(
                     namespace = %ns,
                     resource_name = %name,
@@ -664,7 +666,9 @@ fn error_policy(
                     "Permission error, longer retry interval"
                 );
                 Duration::from_secs(300) // 5 minutes for permission issues
-            } else if kube_error.to_string().contains("TooManyRequests") || kube_error.to_string().contains("throttled") {
+            } else if kube_error.to_string().contains("TooManyRequests")
+                || kube_error.to_string().contains("throttled")
+            {
                 warn!(
                     namespace = %ns,
                     resource_name = %name,
@@ -672,7 +676,9 @@ fn error_policy(
                     "Rate limited, backing off"
                 );
                 Duration::from_secs(60) // 1 minute for rate limiting
-            } else if kube_error.to_string().contains("timeout") || kube_error.to_string().contains("connection") {
+            } else if kube_error.to_string().contains("timeout")
+                || kube_error.to_string().contains("connection")
+            {
                 warn!(
                     namespace = %ns,
                     resource_name = %name,
@@ -701,7 +707,7 @@ fn error_policy(
             Duration::from_secs(120)
         }
     };
-    
+
     error!(
         event = "reconciliation_error",
         namespace = %ns,
@@ -711,7 +717,7 @@ fn error_policy(
         requeue_after_seconds = requeue_duration.as_secs(),
         "Reconciliation failed, scheduling retry with intelligent backoff"
     );
-    
+
     Action::requeue(requeue_duration)
 }
 
