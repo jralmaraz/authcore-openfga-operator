@@ -26,17 +26,45 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Cache cargo registry
+      - name: Install sccache
+        uses: mozilla-actions/sccache-action@v0.0.5
+
+      - name: Cache cargo registry and sccache
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/registry
-            ~/.cargo/git
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
             target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+            ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-
+            ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}-
             ${{ runner.os }}-cargo-
+
+      - name: Configure sccache
+        run: |
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+
+      - name: Pre-fetch dependencies
+        run: |
+          # Create a minimal project structure to pre-fetch dependencies
+          mkdir -p src
+          echo "fn main() {}" > src/main.rs
+          # Download dependencies in parallel and compile them without building the main project
+          cargo fetch --locked
+          # Build dependencies only, without the main binary
+          CARGO_TARGET_DIR=target-deps cargo build --release --lib 2>/dev/null || true
+          # Clean up the dummy files but keep the target cache
+          rm -f src/main.rs
+          # Move compiled dependencies to main target directory for reuse
+          if [ -d "target-deps" ]; then
+            mkdir -p target/release/deps
+            cp -r target-deps/release/deps/* target/release/deps/ 2>/dev/null || true
+            rm -rf target-deps
+          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -70,11 +98,17 @@ jobs:
           push: false
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
             VERSION=${{ steps.extract_version.outputs.cargo_version }}
+            SCCACHE_GHA_ENABLED=true
+            RUSTC_WRAPPER=sccache
 
   publish:
     runs-on: ubuntu-latest
@@ -141,11 +175,17 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: |
+            type=gha
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
             VERSION=${{ steps.extract_version.outputs.cargo_version }}
+            SCCACHE_GHA_ENABLED=true
+            RUSTC_WRAPPER=sccache
 
       - name: Generate build summary
         run: |
