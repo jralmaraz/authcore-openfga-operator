@@ -52,6 +52,23 @@ impl OpenFGAController {
             "Controller watching resources"
         );
 
+        // Test Kubernetes API connectivity before starting controller
+        match self.test_api_connectivity().await {
+            Ok(_) => {
+                info!(
+                    api_connectivity = "verified",
+                    "Kubernetes API connectivity test successful"
+                );
+            }
+            Err(e) => {
+                error!(
+                    api_connectivity = "failed",
+                    error = %e,
+                    "Kubernetes API connectivity test failed, but continuing with controller startup"
+                );
+            }
+        }
+
         Controller::new(openfgas, Config::default().any_semantic())
             .owns(deployments, Config::default())
             .owns(services, Config::default())
@@ -78,6 +95,30 @@ impl OpenFGAController {
             .await;
 
         Ok(())
+    }
+
+    async fn test_api_connectivity(&self) -> Result<(), kube::Error> {
+        debug!("Testing Kubernetes API connectivity");
+        
+        // Try to list namespaces as a basic connectivity test
+        let namespaces: Api<k8s_openapi::api::core::v1::Namespace> = Api::all(self.client.clone());
+        
+        match namespaces.list(&Default::default()).await {
+            Ok(namespace_list) => {
+                info!(
+                    namespace_count = namespace_list.items.len(),
+                    "Successfully connected to Kubernetes API and listed namespaces"
+                );
+                Ok(())
+            }
+            Err(e) => {
+                warn!(
+                    error = %e,
+                    "Failed to list namespaces during connectivity test"
+                );
+                Err(e)
+            }
+        }
     }
 }
 
@@ -598,19 +639,65 @@ fn error_policy(
     
     let requeue_duration = match error {
         ControllerError::Kube(kube_error) => {
+            // More intelligent error handling based on kube-rs patterns
             if kube_error.to_string().contains("NotFound") {
-                // Faster retry for not found errors
-                Duration::from_secs(10)
+                info!(
+                    namespace = %ns,
+                    resource_name = %name,
+                    error_type = "NotFound",
+                    "Resource not found, fast retry for creation"
+                );
+                Duration::from_secs(5)
             } else if kube_error.to_string().contains("Conflict") {
-                // Immediate retry for conflicts
+                info!(
+                    namespace = %ns,
+                    resource_name = %name,
+                    error_type = "Conflict",
+                    "Resource conflict, immediate retry"
+                );
                 Duration::from_secs(1)
+            } else if kube_error.to_string().contains("Forbidden") || kube_error.to_string().contains("Unauthorized") {
+                warn!(
+                    namespace = %ns,
+                    resource_name = %name,
+                    error_type = "Permission",
+                    "Permission error, longer retry interval"
+                );
+                Duration::from_secs(300) // 5 minutes for permission issues
+            } else if kube_error.to_string().contains("TooManyRequests") || kube_error.to_string().contains("throttled") {
+                warn!(
+                    namespace = %ns,
+                    resource_name = %name,
+                    error_type = "RateLimit",
+                    "Rate limited, backing off"
+                );
+                Duration::from_secs(60) // 1 minute for rate limiting
+            } else if kube_error.to_string().contains("timeout") || kube_error.to_string().contains("connection") {
+                warn!(
+                    namespace = %ns,
+                    resource_name = %name,
+                    error_type = "Network",
+                    "Network issue, standard retry"
+                );
+                Duration::from_secs(30)
             } else {
-                // Standard retry for other Kubernetes errors
+                warn!(
+                    namespace = %ns,
+                    resource_name = %name,
+                    error_type = "Unknown",
+                    error_message = %kube_error,
+                    "Unknown Kubernetes error, standard retry"
+                );
                 Duration::from_secs(30)
             }
         }
         ControllerError::Serialization(_) => {
-            // Longer retry for serialization errors
+            error!(
+                namespace = %ns,
+                resource_name = %name,
+                error_type = "Serialization",
+                "Serialization error, longer retry interval"
+            );
             Duration::from_secs(120)
         }
     };
@@ -622,7 +709,7 @@ fn error_policy(
         error_type = ?std::mem::discriminant(error),
         error_message = %error,
         requeue_after_seconds = requeue_duration.as_secs(),
-        "Reconciliation failed, scheduling retry"
+        "Reconciliation failed, scheduling retry with intelligent backoff"
     );
     
     Action::requeue(requeue_duration)

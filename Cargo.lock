@@ -876,6 +876,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "futures",
+ "hyper",
  "k8s-openapi",
  "kube",
  "schemars",
