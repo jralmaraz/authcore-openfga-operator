@@ -150,7 +150,7 @@ mod tests {
         assert_eq!(datastore.uri, None);
 
         let playground = PlaygroundConfig::default();
-        assert_eq!(playground.enabled, false);
+        assert!(!playground.enabled);
         assert_eq!(playground.port, 3000);
 
         let grpc = GrpcConfig::default();
