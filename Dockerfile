@@ -2,6 +2,10 @@
 FROM cgr.dev/chainguard/rust:latest AS builder
 WORKDIR /app
 
+# Accept version as build argument
+ARG VERSION
+ENV VERSION=${VERSION}
+
 # Set up build environment  
 ENV HOME=/tmp/cargo-home
 ENV CARGO_HOME=$HOME/.cargo
@@ -22,6 +26,15 @@ RUN cargo build --release
 
 # Runtime stage - using Chainguard distroless image for smaller size
 FROM cgr.dev/chainguard/glibc-dynamic:latest
+
+# Accept version as build argument
+ARG VERSION
+ENV VERSION=${VERSION}
+
+# Add version information as labels for better traceability
+LABEL org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.title="OpenFGA Operator" \
+      org.opencontainers.image.description="Kubernetes operator for OpenFGA"
 
 # Copy binary from builder stage
 COPY --from=builder /app/target/release/openfga-operator /usr/local/bin/openfga-operator
