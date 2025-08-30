@@ -72,10 +72,7 @@ jobs:
 
       - name: Extract version from Cargo.toml
         id: extract_version
-        run: |
-          CARGO_VERSION=$(grep '^version = ' Cargo.toml | cut -d '"' -f 2)
-          echo "cargo_version=$CARGO_VERSION" >> $GITHUB_OUTPUT
-          echo "Cargo.toml version: $CARGO_VERSION"
+        uses: ./.github/actions/extract-version
 
       - name: Build container image (status check)
         uses: docker/build-push-action@v5
@@ -111,10 +108,7 @@ jobs:
 
       - name: Extract version from Cargo.toml
         id: extract_version
-        run: |
-          CARGO_VERSION=$(grep '^version = ' Cargo.toml | cut -d '"' -f 2)
-          echo "cargo_version=$CARGO_VERSION" >> $GITHUB_OUTPUT
-          echo "Cargo.toml version: $CARGO_VERSION"
+        uses: ./.github/actions/extract-version
 
       - name: Validate version consistency
         run: |

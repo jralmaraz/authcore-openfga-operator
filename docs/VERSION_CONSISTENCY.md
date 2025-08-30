@@ -42,7 +42,7 @@ The workflow now includes:
 
 1. **Version Extraction**:
    ```bash
-   CARGO_VERSION=$(grep '^version = ' Cargo.toml | cut -d '"' -f 2)
+   CARGO_VERSION=$(grep '^version\s*=\s*"' Cargo.toml | sed 's/.*"\([^"]*\)".*/\1/')
    ```
 
 2. **Version Validation**:
@@ -56,9 +56,9 @@ The workflow now includes:
 
 3. **Docker Build with Version**:
    ```yaml
-   build-args: |
-     BUILDKIT_INLINE_CACHE=1
-     VERSION=${{ steps.extract_version.outputs.cargo_version }}
+   build-args:
+     - BUILDKIT_INLINE_CACHE=1
+     - VERSION=${{ steps.extract_version.outputs.cargo_version }}
    ```
 
 ### Build Process
