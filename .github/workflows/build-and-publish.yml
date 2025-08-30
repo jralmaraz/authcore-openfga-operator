@@ -50,21 +50,8 @@ jobs:
 
       - name: Pre-fetch dependencies
         run: |
-          # Create a minimal project structure to pre-fetch dependencies
-          mkdir -p src
-          echo "fn main() {}" > src/main.rs
-          # Download dependencies in parallel and compile them without building the main project
+          # Download dependencies without interfering with existing source
           cargo fetch --locked
-          # Build dependencies only, without the main binary
-          CARGO_TARGET_DIR=target-deps cargo build --release --lib 2>/dev/null || true
-          # Clean up the dummy files but keep the target cache
-          rm -f src/main.rs
-          # Move compiled dependencies to main target directory for reuse
-          if [ -d "target-deps" ]; then
-            mkdir -p target/release/deps
-            cp -r target-deps/release/deps/* target/release/deps/ 2>/dev/null || true
-            rm -rf target-deps
-          fi
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3

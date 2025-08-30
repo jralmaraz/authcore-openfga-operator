@@ -28,7 +28,7 @@ RUN cargo build --release && \
     rm -rf src target/release/deps/openfga_operator* target/release/openfga-operator*
 
 # Copy all source code
-COPY . .
+COPY src ./src
 
 # Build the actual application with all optimizations
 RUN cargo build --release && \
