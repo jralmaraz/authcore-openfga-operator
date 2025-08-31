@@ -8,6 +8,9 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # Cache fallback configuration
+  # Set DISABLE_CACHE=true to disable all caching (for cache service outages)
+  # DISABLE_CACHE: true
 
 jobs:
   test:
@@ -31,9 +34,13 @@ jobs:
     
     - name: Install sccache
       uses: mozilla-actions/sccache-action@v0.0.5
+      continue-on-error: true
+      id: sccache-install
     
     - name: Cache cargo registry and sccache
       uses: actions/cache@v4
+      continue-on-error: true
+      id: cache-cargo
       with:
         path: |
           ~/.cargo/registry/index
@@ -48,10 +55,24 @@ jobs:
           ${{ runner.os }}-${{ matrix.rust }}-cargo-
           ${{ runner.os }}-cargo-
     
-    - name: Configure sccache
+    - name: Configure sccache with fallback
       run: |
-        echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-        echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+        # Check if sccache installation and cache are available
+        if [ "${{ steps.sccache-install.outcome }}" = "success" ] && [ "${{ env.DISABLE_CACHE }}" != "true" ]; then
+          echo "✅ Configuring sccache with GitHub Actions backend"
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+        elif command -v sccache >/dev/null 2>&1 && [ "${{ env.DISABLE_CACHE }}" != "true" ]; then
+          echo "⚠️  GitHub Actions cache unavailable, using local sccache"
+          echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
+          echo "SCCACHE_CACHE_SIZE=2G" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          mkdir -p $HOME/.cache/sccache
+        else
+          echo "❌ Cache unavailable or disabled, building without cache"
+          echo "Cache status: sccache-install=${{ steps.sccache-install.outcome }}, cache-cargo=${{ steps.cache-cargo.outcome }}"
+          echo "DISABLE_CACHE=true" >> $GITHUB_ENV
+        fi
     
     - name: Check formatting
       if: matrix.check_fmt
@@ -78,9 +99,13 @@ jobs:
     
     - name: Install sccache
       uses: mozilla-actions/sccache-action@v0.0.5
+      continue-on-error: true
+      id: sccache-install
     
     - name: Cache cargo registry and sccache
       uses: actions/cache@v4
+      continue-on-error: true
+      id: cache-cargo
       with:
         path: |
           ~/.cargo/registry/index
@@ -95,10 +120,24 @@ jobs:
           ${{ runner.os }}-stable-cargo-
           ${{ runner.os }}-cargo-
     
-    - name: Configure sccache
+    - name: Configure sccache with fallback
       run: |
-        echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-        echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+        # Check if sccache installation and cache are available
+        if [ "${{ steps.sccache-install.outcome }}" = "success" ] && [ "${{ env.DISABLE_CACHE }}" != "true" ]; then
+          echo "✅ Configuring sccache with GitHub Actions backend"
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+        elif command -v sccache >/dev/null 2>&1 && [ "${{ env.DISABLE_CACHE }}" != "true" ]; then
+          echo "⚠️  GitHub Actions cache unavailable, using local sccache"
+          echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
+          echo "SCCACHE_CACHE_SIZE=2G" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          mkdir -p $HOME/.cache/sccache
+        else
+          echo "❌ Cache unavailable or disabled, building without cache"
+          echo "Cache status: sccache-install=${{ steps.sccache-install.outcome }}, cache-cargo=${{ steps.cache-cargo.outcome }}"
+          echo "DISABLE_CACHE=true" >> $GITHUB_ENV
+        fi
     
     - name: Run build check
       run: make build

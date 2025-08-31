@@ -6,6 +6,7 @@ WORKDIR /app
 ARG VERSION
 ARG SCCACHE_GHA_ENABLED
 ARG RUSTC_WRAPPER
+ARG DISABLE_CACHE
 
 # Set up environment variables
 ENV VERSION=${VERSION}
@@ -13,6 +14,7 @@ ENV HOME=/tmp/cargo-home
 ENV CARGO_HOME=$HOME/.cargo
 ENV SCCACHE_GHA_ENABLED=${SCCACHE_GHA_ENABLED:-false}
 ENV RUSTC_WRAPPER=${RUSTC_WRAPPER:-}
+ENV DISABLE_CACHE=${DISABLE_CACHE:-false}
 
 # Set up build environment with proper permissions
 RUN mkdir -p $HOME $CARGO_HOME && chmod 755 $HOME $CARGO_HOME
