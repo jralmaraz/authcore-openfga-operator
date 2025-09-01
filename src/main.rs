@@ -1,16 +1,6 @@
 mod controller;
 mod types;
 
-// Demo modules - included for testing and demonstration
-pub mod demos {
-    pub mod banking_app {
-        include!("../demos/banking-app/banking_demo.rs");
-    }
-    pub mod genai_rag {
-        include!("../demos/genai-rag/genai_rag_demo.rs");
-    }
-}
-
 use anyhow::Result;
 use controller::OpenFGAController;
 use hyper::service::{make_service_fn, service_fn};
