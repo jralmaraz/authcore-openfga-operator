@@ -239,7 +239,9 @@ jobs:
         uses: ./.github/actions/extract-version
 
       # Check for version mismatch and emit warning instead of failing
-      # This allows the workflow to continue and automatically sync versions
+      # NOTE: The automatic version sync step that used to follow this check is now DISABLED
+      # due to main branch protection requiring all changes to go through Pull Requests.
+      # Version mismatches will be detected and warned about, but not automatically fixed.
       - name: Check version consistency (warning only)
         id: version_check
         run: |
@@ -252,7 +254,7 @@ jobs:
           if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
             echo "⚠️  Version mismatch detected!"
             echo "Git tag version ($TAG_VERSION) does not match Cargo.toml version ($CARGO_VERSION)"
-            echo "The workflow will automatically sync Cargo.toml to match the Git tag version."
+            echo "❌ AUTOMATIC SYNC DISABLED: Please manually update Cargo.toml via Pull Request"
             echo "version_mismatch=true" >> $GITHUB_OUTPUT
             echo "tag_version=$TAG_VERSION" >> $GITHUB_OUTPUT
           else
@@ -261,62 +263,97 @@ jobs:
             echo "tag_version=$TAG_VERSION" >> $GITHUB_OUTPUT
           fi
 
-      # Automatically sync Cargo.toml version to match Git tag when there's a mismatch
-      # This eliminates the need for manual version updates in Cargo.toml for releases
-      - name: Sync Cargo.toml version with Git tag
-        if: steps.version_check.outputs.version_mismatch == 'true'
-        run: |
-          TAG_VERSION=${{ steps.version_check.outputs.tag_version }}
-          echo "🔄 Syncing Cargo.toml version to match Git tag: $TAG_VERSION"
-          
-          # Configure git for the automated commit
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          
-          # Update the version field in Cargo.toml in the current working directory
-          sed -i "s/^version = \".*\"/version = \"$TAG_VERSION\"/" Cargo.toml
-          
-          # Verify the change
-          NEW_VERSION=$(grep '^version\s*=\s*"' Cargo.toml | sed 's/.*"\([^"]*\)".*/\1/')
-          echo "Updated Cargo.toml version to: $NEW_VERSION"
-          
-          # Fetch the main branch and create a temporary branch for the commit
-          git fetch origin main:main
-          git checkout main
-          
-          # Apply the same change to main branch
-          sed -i "s/^version = \".*\"/version = \"$TAG_VERSION\"/" Cargo.toml
-          
-          # Commit and push the version sync to main
-          git add Cargo.toml
-          git commit -m "chore: sync Cargo.toml version to $TAG_VERSION for release"
-          git push origin main
-          
-          # Return to the tag for the build process
-          git checkout ${GITHUB_REF#refs/tags/}
-          
-          # Ensure our working directory has the updated version for the build
-          sed -i "s/^version = \".*\"/version = \"$TAG_VERSION\"/" Cargo.toml
-          
-          echo "✅ Successfully synced and committed Cargo.toml version update"
+      # DISABLED: Automatically sync Cargo.toml version to match Git tag when there's a mismatch
+      # This step is currently disabled because direct commits to the main branch are prohibited
+      # due to branch protection rules that require all changes to go through Pull Requests.
+      #
+      # The automated push to main (git push origin main) fails because:
+      # - Main branch protection requires PR reviews
+      # - Direct commits are not allowed, even from GitHub Actions
+      #
+      # FUTURE ENHANCEMENT:
+      # Consider creating a separate release workflow that:
+      # 1. Detects version mismatches during tag creation
+      # 2. Opens a Pull Request to update Cargo.toml version
+      # 3. Automatically merges the PR after CI validation
+      # 4. Re-triggers the build after version sync
+      #
+      # The code below is preserved for easy re-enablement once a proper
+      # PR-based version sync mechanism is implemented.
+      #
+      # - name: Sync Cargo.toml version with Git tag
+      #   if: steps.version_check.outputs.version_mismatch == 'true'
+      #   run: |
+      #     TAG_VERSION=${{ steps.version_check.outputs.tag_version }}
+      #     echo "🔄 Syncing Cargo.toml version to match Git tag: $TAG_VERSION"
+      #     
+      #     # Configure git for the automated commit
+      #     git config --local user.email "action@github.com"
+      #     git config --local user.name "GitHub Action"
+      #     
+      #     # Update the version field in Cargo.toml in the current working directory
+      #     sed -i "s/^version = \".*\"/version = \"$TAG_VERSION\"/" Cargo.toml
+      #     
+      #     # Verify the change
+      #     NEW_VERSION=$(grep '^version\s*=\s*"' Cargo.toml | sed 's/.*"\([^"]*\)".*/\1/')
+      #     echo "Updated Cargo.toml version to: $NEW_VERSION"
+      #     
+      #     # Fetch the main branch and create a temporary branch for the commit
+      #     git fetch origin main:main
+      #     git checkout main
+      #     
+      #     # Apply the same change to main branch
+      #     sed -i "s/^version = \".*\"/version = \"$TAG_VERSION\"/" Cargo.toml
+      #     
+      #     # Commit and push the version sync to main
+      #     git add Cargo.toml
+      #     git commit -m "chore: sync Cargo.toml version to $TAG_VERSION for release"
+      #     git push origin main
+      #     
+      #     # Return to the tag for the build process
+      #     git checkout ${GITHUB_REF#refs/tags/}
+      #     
+      #     # Ensure our working directory has the updated version for the build
+      #     sed -i "s/^version = \".*\"/version = \"$TAG_VERSION\"/" Cargo.toml
+      #     
+      #     echo "✅ Successfully synced and committed Cargo.toml version update"
 
-      # Re-extract version after potential sync to ensure we use the updated version
-      - name: Re-extract version from Cargo.toml
-        if: steps.version_check.outputs.version_mismatch == 'true'
-        id: extract_version_updated
-        uses: ./.github/actions/extract-version
+      # DISABLED: Re-extract version after sync (part of disabled version sync functionality)
+      # This step was used to re-extract the version after the automated sync step above.
+      # Since the sync step is disabled, this step is also commented out.
+      #
+      # - name: Re-extract version from Cargo.toml
+      #   if: steps.version_check.outputs.version_mismatch == 'true'
+      #   id: extract_version_updated
+      #   uses: ./.github/actions/extract-version
 
-      # Set the final version to use for Docker build - either original or synced version
+      # Set the final version to use for Docker build
+      # Since the version sync step is disabled, we always use the original extracted version
+      # When version sync is re-enabled, this logic should be updated to handle synced versions
       - name: Set final version for build
         id: final_version
         run: |
+          # ORIGINAL LOGIC (when sync was enabled):
+          # if [ "${{ steps.version_check.outputs.version_mismatch }}" = "true" ]; then
+          #   FINAL_VERSION="${{ steps.extract_version_updated.outputs.cargo_version }}"
+          #   echo "Using synced version: $FINAL_VERSION"
+          # else
+          #   FINAL_VERSION="${{ steps.extract_version.outputs.cargo_version }}"
+          #   echo "Using original version: $FINAL_VERSION"
+          # fi
+          
+          # CURRENT LOGIC (sync disabled - always use original version):
+          FINAL_VERSION="${{ steps.extract_version.outputs.cargo_version }}"
+          echo "Using original Cargo.toml version: $FINAL_VERSION"
+          
+          # Warn if there's a version mismatch since sync is disabled
           if [ "${{ steps.version_check.outputs.version_mismatch }}" = "true" ]; then
-            FINAL_VERSION="${{ steps.extract_version_updated.outputs.cargo_version }}"
-            echo "Using synced version: $FINAL_VERSION"
-          else
-            FINAL_VERSION="${{ steps.extract_version.outputs.cargo_version }}"
-            echo "Using original version: $FINAL_VERSION"
+            echo "⚠️  WARNING: Version mismatch detected but sync is disabled!"
+            echo "Git tag version: ${{ steps.version_check.outputs.tag_version }}"
+            echo "Cargo.toml version: $FINAL_VERSION"
+            echo "Consider manually updating Cargo.toml or re-enabling the sync mechanism via PR."
           fi
+          
           echo "version=$FINAL_VERSION" >> $GITHUB_OUTPUT
 
       - name: Log in to Container Registry
