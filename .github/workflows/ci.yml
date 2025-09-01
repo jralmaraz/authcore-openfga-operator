@@ -8,102 +8,428 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  # Cache fallback configuration
+  # Uncomment the line below to disable all caching during GitHub Actions outages:
+  # DISABLE_CACHE: true
+  
+  # Cache outage recovery mode:
+  # Set DISABLE_CACHE=true in your repository secrets or environment variables
+  # if you need to bypass caching due to widespread GitHub Actions issues
 
 jobs:
-  compile:
-    name: Compile Check
+  test:
+    name: Test, Format, and Lint
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust: [stable]
+        include:
+          - rust: stable
+            check_fmt: true
+            check_clippy: true
     steps:
     - uses: actions/checkout@v4
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-    - name: Cache cargo registry
+    
+    - name: Install Rust ${{ matrix.rust }}
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.rust }}
+        components: ${{ matrix.check_fmt && 'rustfmt' || '' }}${{ matrix.check_clippy && matrix.check_fmt && ',' || '' }}${{ matrix.check_clippy && 'clippy' || '' }}
+    
+    - name: Install sccache
+      uses: mozilla-actions/sccache-action@v0.0.5
+      continue-on-error: true
+      id: sccache-install
+    
+    - name: Cache cargo registry and sccache
       uses: actions/cache@v4
+      continue-on-error: true
+      id: cache-cargo
       with:
         path: |
-          ~/.cargo/registry
-          ~/.cargo/git
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
           target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-${{ matrix.rust }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
         restore-keys: |
-          ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          ${{ runner.os }}-${{ matrix.rust }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}-
+          ${{ runner.os }}-${{ matrix.rust }}-cargo-test-${{ hashFiles('**/Cargo.toml') }}-
+          ${{ runner.os }}-${{ matrix.rust }}-cargo-test-
+          ${{ runner.os }}-${{ matrix.rust }}-cargo-
           ${{ runner.os }}-cargo-
-    - name: Run compile check
-      run: make compile
+    
+    - name: Configure sccache with robust fallback
+      run: |
+        # Global environment for cache bypass during outages
+        if [ "${{ env.DISABLE_CACHE }}" = "true" ]; then
+          echo "🚫 Cache manually disabled via DISABLE_CACHE environment variable"
+          echo "DISABLE_CACHE=true" >> $GITHUB_ENV
+          echo "CACHE_STATUS=disabled" >> $GITHUB_ENV
+          exit 0
+        fi
+        
+        # Test cache connectivity before configuring sccache
+        test_cache_connectivity() {
+          local test_result=0
+          
+          # Test GitHub Actions cache connectivity with timeout
+          if command -v sccache >/dev/null 2>&1; then
+            echo "Testing sccache connectivity..."
+            
+            # Create a temporary test environment
+            export SCCACHE_GHA_ENABLED=true
+            export RUSTC_WRAPPER=sccache
+            
+            # Test with a simple command and timeout
+            timeout 30s sccache --show-stats >/dev/null 2>&1 || test_result=1
+            
+            # Additional connectivity test - try to start the server
+            if [ $test_result -eq 0 ]; then
+              timeout 15s sccache --start-server >/dev/null 2>&1 || test_result=1
+            fi
+            
+            # Clean up test environment
+            unset SCCACHE_GHA_ENABLED RUSTC_WRAPPER
+            sccache --stop-server >/dev/null 2>&1 || true
+          else
+            test_result=1
+          fi
+          
+          return $test_result
+        }
+        
+        # Attempt cache configuration with fallback hierarchy
+        if [ "${{ steps.sccache-install.outcome }}" = "success" ]; then
+          if test_cache_connectivity; then
+            echo "✅ GitHub Actions cache connectivity verified - using sccache with GHA backend"
+            echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+            echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+            echo "CACHE_STATUS=gha" >> $GITHUB_ENV
+          else
+            echo "⚠️  GitHub Actions cache connectivity failed - attempting local sccache fallback"
+            # Try local sccache as fallback
+            mkdir -p $HOME/.cache/sccache
+            export SCCACHE_DIR=$HOME/.cache/sccache
+            export SCCACHE_CACHE_SIZE=2G
+            export RUSTC_WRAPPER=sccache
+            
+            if timeout 15s sccache --show-stats >/dev/null 2>&1; then
+              echo "✅ Local sccache fallback successful"
+              echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
+              echo "SCCACHE_CACHE_SIZE=2G" >> $GITHUB_ENV
+              echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+              echo "CACHE_STATUS=local" >> $GITHUB_ENV
+            else
+              echo "❌ Local sccache also failed - building without cache"
+              echo "DISABLE_CACHE=true" >> $GITHUB_ENV
+              echo "CACHE_STATUS=failed" >> $GITHUB_ENV
+            fi
+            
+            # Clean up test environment
+            unset SCCACHE_DIR SCCACHE_CACHE_SIZE RUSTC_WRAPPER
+            sccache --stop-server >/dev/null 2>&1 || true
+          fi
+        else
+          echo "❌ sccache installation failed - building without cache"
+          echo "DISABLE_CACHE=true" >> $GITHUB_ENV
+          echo "CACHE_STATUS=no_sccache" >> $GITHUB_ENV
+        fi
+        
+        echo "Final cache status: ${{ env.CACHE_STATUS || 'unknown' }}"
+        echo "sccache-install outcome: ${{ steps.sccache-install.outcome }}"
+        echo "cargo-cache outcome: ${{ steps.cache-cargo.outcome }}"
+    
+    - name: Check formatting
+      if: matrix.check_fmt
+      run: cargo fmt -- --check
+    
+    - name: Run clippy with error handling
+      if: matrix.check_clippy
+      run: |
+        # Function to run cargo commands with sccache fallback
+        run_cargo_with_fallback() {
+          local cmd="$1"
+          local attempt=1
+          local max_attempts=2
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Running '$cmd' (attempt $attempt/$max_attempts)..."
+            
+            # Execute command with timeout
+            if timeout 900s $cmd 2>&1 | tee cargo-log-clippy-$attempt.txt; then
+              echo "✅ Command successful on attempt $attempt"
+              return 0
+            else
+              echo "❌ Command failed on attempt $attempt"
+              
+              # Check if it's a cache-related error and we have sccache enabled
+              if [ "${{ env.RUSTC_WRAPPER }}" = "sccache" ] && grep -q "sccache\|cache\|400.*Bad Request" cargo-log-clippy-$attempt.txt; then
+                echo "Detected sccache error, disabling cache for retry"
+                unset RUSTC_WRAPPER SCCACHE_GHA_ENABLED SCCACHE_DIR
+                echo "DISABLE_CACHE=true" >> $GITHUB_ENV
+                # Stop sccache server
+                sccache --stop-server >/dev/null 2>&1 || true
+              elif [ $attempt -eq $max_attempts ]; then
+                echo "❌ Command failed after $max_attempts attempts"
+                echo "Error logs:"
+                cat cargo-log-clippy-$attempt.txt
+                return 1
+              fi
+              
+              attempt=$((attempt + 1))
+              echo "Retrying in 15 seconds..."
+              sleep 15
+            fi
+          done
+          
+          return 1
+        }
+        
+        # Run clippy with fallback
+        run_cargo_with_fallback "make clippy"
+    
+    - name: Run compile check with error handling
+      run: |
+        # Function to run cargo commands with sccache fallback
+        run_cargo_with_fallback() {
+          local cmd="$1"
+          local attempt=1
+          local max_attempts=2
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Running '$cmd' (attempt $attempt/$max_attempts)..."
+            
+            # Execute command with timeout
+            if timeout 900s $cmd 2>&1 | tee cargo-log-$attempt.txt; then
+              echo "✅ Command successful on attempt $attempt"
+              return 0
+            else
+              echo "❌ Command failed on attempt $attempt"
+              
+              # Check if it's a cache-related error and we have sccache enabled
+              if [ "${{ env.RUSTC_WRAPPER }}" = "sccache" ] && grep -q "sccache\|cache\|400.*Bad Request" cargo-log-$attempt.txt; then
+                echo "Detected sccache error, disabling cache for retry"
+                unset RUSTC_WRAPPER SCCACHE_GHA_ENABLED SCCACHE_DIR
+                echo "DISABLE_CACHE=true" >> $GITHUB_ENV
+                # Stop sccache server
+                sccache --stop-server >/dev/null 2>&1 || true
+              elif [ $attempt -eq $max_attempts ]; then
+                echo "❌ Command failed after $max_attempts attempts"
+                echo "Error logs:"
+                cat cargo-log-$attempt.txt
+                return 1
+              fi
+              
+              attempt=$((attempt + 1))
+              echo "Retrying in 15 seconds..."
+              sleep 15
+            fi
+          done
+          
+          return 1
+        }
+        
+        # Run compile check with fallback
+        run_cargo_with_fallback "make compile"
+    
+    - name: Run tests with error handling
+      run: |
+        # Function to run cargo commands with sccache fallback
+        run_cargo_with_fallback() {
+          local cmd="$1"
+          local attempt=1
+          local max_attempts=2
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Running '$cmd' (attempt $attempt/$max_attempts)..."
+            
+            # Execute command with timeout
+            if timeout 900s $cmd 2>&1 | tee cargo-log-test-$attempt.txt; then
+              echo "✅ Command successful on attempt $attempt"
+              return 0
+            else
+              echo "❌ Command failed on attempt $attempt"
+              
+              # Check if it's a cache-related error and we have sccache enabled
+              if [ "${{ env.RUSTC_WRAPPER }}" = "sccache" ] && grep -q "sccache\|cache\|400.*Bad Request" cargo-log-test-$attempt.txt; then
+                echo "Detected sccache error, disabling cache for retry"
+                unset RUSTC_WRAPPER SCCACHE_GHA_ENABLED SCCACHE_DIR
+                echo "DISABLE_CACHE=true" >> $GITHUB_ENV
+                # Stop sccache server
+                sccache --stop-server >/dev/null 2>&1 || true
+              elif [ $attempt -eq $max_attempts ]; then
+                echo "❌ Command failed after $max_attempts attempts"
+                echo "Error logs:"
+                cat cargo-log-test-$attempt.txt
+                return 1
+              fi
+              
+              attempt=$((attempt + 1))
+              echo "Retrying in 15 seconds..."
+              sleep 15
+            fi
+          done
+          
+          return 1
+        }
+        
+        # Run tests with fallback
+        run_cargo_with_fallback "make test"
 
   build:
-    name: Build Check
+    name: Build Verification
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+    
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
-    - name: Cache cargo registry
+    
+    - name: Install sccache
+      uses: mozilla-actions/sccache-action@v0.0.5
+      continue-on-error: true
+      id: sccache-install
+    
+    - name: Cache cargo registry and sccache
       uses: actions/cache@v4
+      continue-on-error: true
+      id: cache-cargo
       with:
         path: |
-          ~/.cargo/registry
-          ~/.cargo/git
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
           target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/Cargo.toml') }}
         restore-keys: |
-          ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}-
+          ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.toml') }}-
+          ${{ runner.os }}-cargo-build-
+          ${{ runner.os }}-stable-cargo-
           ${{ runner.os }}-cargo-
-    - name: Run build check
-      run: make build
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-    - name: Cache cargo registry
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          ${{ runner.os }}-cargo-
-    - name: Run tests
-      run: make test
-
-  fmt:
-    name: Format Check
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: rustfmt
-    - name: Check formatting
-      run: cargo fmt -- --check
-
-  clippy:
-    name: Clippy Check
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@stable
-      with:
-        components: clippy
-    - name: Cache cargo registry
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          ${{ runner.os }}-cargo-
-    - name: Run clippy
-      run: make clippy
+    
+    - name: Configure sccache with robust fallback
+      run: |
+        # Global environment for cache bypass during outages
+        if [ "${{ env.DISABLE_CACHE }}" = "true" ]; then
+          echo "🚫 Cache manually disabled via DISABLE_CACHE environment variable"
+          echo "DISABLE_CACHE=true" >> $GITHUB_ENV
+          echo "CACHE_STATUS=disabled" >> $GITHUB_ENV
+          exit 0
+        fi
+        
+        # Test cache connectivity before configuring sccache
+        test_cache_connectivity() {
+          local test_result=0
+          
+          # Test GitHub Actions cache connectivity with timeout
+          if command -v sccache >/dev/null 2>&1; then
+            echo "Testing sccache connectivity..."
+            
+            # Create a temporary test environment
+            export SCCACHE_GHA_ENABLED=true
+            export RUSTC_WRAPPER=sccache
+            
+            # Test with a simple command and timeout
+            timeout 30s sccache --show-stats >/dev/null 2>&1 || test_result=1
+            
+            # Additional connectivity test - try to start the server
+            if [ $test_result -eq 0 ]; then
+              timeout 15s sccache --start-server >/dev/null 2>&1 || test_result=1
+            fi
+            
+            # Clean up test environment
+            unset SCCACHE_GHA_ENABLED RUSTC_WRAPPER
+            sccache --stop-server >/dev/null 2>&1 || true
+          else
+            test_result=1
+          fi
+          
+          return $test_result
+        }
+        
+        # Attempt cache configuration with fallback hierarchy
+        if [ "${{ steps.sccache-install.outcome }}" = "success" ]; then
+          if test_cache_connectivity; then
+            echo "✅ GitHub Actions cache connectivity verified - using sccache with GHA backend"
+            echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+            echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+            echo "CACHE_STATUS=gha" >> $GITHUB_ENV
+          else
+            echo "⚠️  GitHub Actions cache connectivity failed - attempting local sccache fallback"
+            # Try local sccache as fallback
+            mkdir -p $HOME/.cache/sccache
+            export SCCACHE_DIR=$HOME/.cache/sccache
+            export SCCACHE_CACHE_SIZE=2G
+            export RUSTC_WRAPPER=sccache
+            
+            if timeout 15s sccache --show-stats >/dev/null 2>&1; then
+              echo "✅ Local sccache fallback successful"
+              echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
+              echo "SCCACHE_CACHE_SIZE=2G" >> $GITHUB_ENV
+              echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+              echo "CACHE_STATUS=local" >> $GITHUB_ENV
+            else
+              echo "❌ Local sccache also failed - building without cache"
+              echo "DISABLE_CACHE=true" >> $GITHUB_ENV
+              echo "CACHE_STATUS=failed" >> $GITHUB_ENV
+            fi
+            
+            # Clean up test environment
+            unset SCCACHE_DIR SCCACHE_CACHE_SIZE RUSTC_WRAPPER
+            sccache --stop-server >/dev/null 2>&1 || true
+          fi
+        else
+          echo "❌ sccache installation failed - building without cache"
+          echo "DISABLE_CACHE=true" >> $GITHUB_ENV
+          echo "CACHE_STATUS=no_sccache" >> $GITHUB_ENV
+        fi
+        
+        echo "Final cache status: ${{ env.CACHE_STATUS || 'unknown' }}"
+        echo "sccache-install outcome: ${{ steps.sccache-install.outcome }}"
+        echo "cargo-cache outcome: ${{ steps.cache-cargo.outcome }}"
+    
+    - name: Run build check with error handling
+      run: |
+        # Function to run cargo commands with sccache fallback
+        run_cargo_with_fallback() {
+          local cmd="$1"
+          local attempt=1
+          local max_attempts=2
+          
+          while [ $attempt -le $max_attempts ]; do
+            echo "Running '$cmd' (attempt $attempt/$max_attempts)..."
+            
+            # Execute command with timeout
+            if timeout 900s $cmd 2>&1 | tee cargo-log-build-$attempt.txt; then
+              echo "✅ Command successful on attempt $attempt"
+              return 0
+            else
+              echo "❌ Command failed on attempt $attempt"
+              
+              # Check if it's a cache-related error and we have sccache enabled
+              if [ "${{ env.RUSTC_WRAPPER }}" = "sccache" ] && grep -q "sccache\|cache\|400.*Bad Request" cargo-log-build-$attempt.txt; then
+                echo "Detected sccache error, disabling cache for retry"
+                unset RUSTC_WRAPPER SCCACHE_GHA_ENABLED SCCACHE_DIR
+                echo "DISABLE_CACHE=true" >> $GITHUB_ENV
+                # Stop sccache server
+                sccache --stop-server >/dev/null 2>&1 || true
+              elif [ $attempt -eq $max_attempts ]; then
+                echo "❌ Command failed after $max_attempts attempts"
+                echo "Error logs:"
+                cat cargo-log-build-$attempt.txt
+                return 1
+              fi
+              
+              attempt=$((attempt + 1))
+              echo "Retrying in 15 seconds..."
+              sleep 15
+            fi
+          done
+          
+          return 1
+        }
+        
+        # Run build check with fallback
+        run_cargo_with_fallback "make build"
