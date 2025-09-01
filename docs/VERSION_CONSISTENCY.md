@@ -45,33 +45,64 @@ The workflow now includes:
    CARGO_VERSION=$(grep '^version\s*=\s*"' Cargo.toml | sed 's/.*"\([^"]*\)".*/\1/')
    ```
 
-2. **Version Validation**:
+2. **Version Check (Warning Mode)**:
    ```bash
    TAG_VERSION=${GITHUB_REF#refs/tags/v}
    if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
-     echo "❌ Version mismatch detected!"
-     exit 1
+     echo "⚠️  Version mismatch detected!"
+     echo "The workflow will automatically sync Cargo.toml to match the Git tag version."
+     # Continue without failing
    fi
    ```
 
-3. **Docker Build with Version**:
+3. **Automatic Version Sync** (when mismatch detected):
+   ```bash
+   # Update Cargo.toml version to match Git tag
+   sed -i "s/^version = \".*\"/version = \"$TAG_VERSION\"/" Cargo.toml
+   
+   # Commit and push to main branch
+   git add Cargo.toml
+   git commit -m "chore: sync Cargo.toml version to $TAG_VERSION for release"
+   git push origin main
+   ```
+
+4. **Docker Build with Synchronized Version**:
    ```yaml
    build-args:
      - BUILDKIT_INLINE_CACHE=1
-     - VERSION=${{ steps.extract_version.outputs.cargo_version }}
+     - VERSION=${{ steps.final_version.outputs.version }}
    ```
 
 ### Build Process
 
 1. **Trigger**: Push of tag prefixed with `v` (e.g., `v0.1.0`)
 2. **Extract**: Version from `Cargo.toml`
-3. **Validate**: Git tag version matches package version
-4. **Build**: Container with embedded version information
-5. **Publish**: Only if validation passes
+3. **Check**: Git tag version against package version
+4. **Auto-sync**: Update `Cargo.toml` if mismatch detected (with commit to main)
+5. **Build**: Container with synchronized version information
+6. **Publish**: Using the correct version tags
 
 ## Usage
 
 ### Creating a Release
+
+**New Simplified Process (Automated):**
+
+1. Create and push git tag:
+   ```bash
+   git tag v0.2.0
+   git push origin v0.2.0
+   ```
+
+2. GitHub Actions will automatically:
+   - Extract version from current `Cargo.toml`
+   - Check if tag `v0.2.0` matches package version
+   - **If mismatch**: Automatically sync `Cargo.toml` to version `0.2.0` and commit to main
+   - **If match**: Continue with existing version
+   - Build container with correct `VERSION=0.2.0`
+   - Publish with appropriate tags
+
+**Traditional Process (Still Supported):**
 
 1. Update version in `Cargo.toml`:
    ```toml
@@ -93,7 +124,28 @@ The workflow now includes:
 
 ### Version Mismatch Handling
 
-If versions don't match, the build will fail with:
+**New Automated Behavior:**
+
+If versions don't match, the workflow will emit a warning and automatically sync:
+
+```
+⚠️  Version mismatch detected!
+Git tag version (0.2.0) does not match Cargo.toml version (0.1.0)
+The workflow will automatically sync Cargo.toml to match the Git tag version.
+🔄 Syncing Cargo.toml version to match Git tag: 0.2.0
+✅ Successfully synced and committed Cargo.toml version update
+```
+
+The workflow will:
+1. Detect the version mismatch
+2. Emit a warning (not fail)
+3. Update `Cargo.toml` to match the Git tag version
+4. Commit the change to the main branch
+5. Continue with the build using the synchronized version
+
+**Legacy Behavior (Preserved for Reference):**
+
+Previously, version mismatches would cause build failures with:
 
 ```
 ❌ Version mismatch detected!
@@ -104,10 +156,12 @@ Please ensure the git tag version matches the version in Cargo.toml
 ## Benefits
 
 1. **Consistency**: Ensures package and container versions always match
-2. **Automation**: No manual intervention required for version synchronization
-3. **Traceability**: Container images include version metadata
-4. **Error Prevention**: Prevents release of incorrectly versioned containers
-5. **Developer Experience**: Clear error messages when versions mismatch
+2. **Full Automation**: Zero manual intervention required for version synchronization
+3. **Simplified Release Process**: Create tag and let automation handle the rest
+4. **Traceability**: Container images include version metadata
+5. **Error Prevention**: Prevents release of incorrectly versioned containers
+6. **Developer Experience**: Automated sync with clear progress messages
+7. **Backward Compatibility**: Traditional manual process still works seamlessly
 
 ## Verification
 
