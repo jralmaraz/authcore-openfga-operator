@@ -52,10 +52,18 @@ jobs:
     
     - name: Configure sccache
       run: |
-        if [ "${{ steps.sccache-install.outcome }}" = "success" ]; then
-          echo "✅ Configuring sccache with GitHub Actions backend"
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+        # Test if sccache is working properly
+        if [ "${{ steps.sccache-install.outcome }}" = "success" ] && command -v sccache >/dev/null 2>&1; then
+          # Test sccache connectivity to GitHub Actions cache
+          if sccache --show-stats >/dev/null 2>&1; then
+            echo "✅ Configuring sccache with GitHub Actions backend"
+            echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+            echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+            sccache --show-stats || echo "⚠️ sccache stats unavailable but proceeding"
+          else
+            echo "⚠️ sccache connectivity test failed, likely GitHub Actions cache service issue"
+            echo "🔄 Proceeding without sccache to avoid build failures"
+          fi
         else
           echo "⚠️ sccache not available, proceeding without sccache"
         fi
@@ -105,10 +113,18 @@ jobs:
     
     - name: Configure sccache
       run: |
-        if [ "${{ steps.sccache-install.outcome }}" = "success" ]; then
-          echo "✅ Configuring sccache with GitHub Actions backend"
-          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+        # Test if sccache is working properly
+        if [ "${{ steps.sccache-install.outcome }}" = "success" ] && command -v sccache >/dev/null 2>&1; then
+          # Test sccache connectivity to GitHub Actions cache
+          if sccache --show-stats >/dev/null 2>&1; then
+            echo "✅ Configuring sccache with GitHub Actions backend"
+            echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+            echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+            sccache --show-stats || echo "⚠️ sccache stats unavailable but proceeding"
+          else
+            echo "⚠️ sccache connectivity test failed, likely GitHub Actions cache service issue"
+            echo "🔄 Proceeding without sccache to avoid build failures"
+          fi
         else
           echo "⚠️ sccache not available, proceeding without sccache"
         fi
