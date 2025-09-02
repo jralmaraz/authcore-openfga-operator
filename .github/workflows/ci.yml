@@ -54,15 +54,14 @@ jobs:
       run: |
         # Test if sccache is working properly
         if [ "${{ steps.sccache-install.outcome }}" = "success" ] && command -v sccache >/dev/null 2>&1; then
-          # Test sccache connectivity to GitHub Actions cache
+          echo "✅ sccache installed, configuring with GitHub Actions backend"
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          # Test connectivity but don't fail if it doesn't work yet
           if sccache --show-stats >/dev/null 2>&1; then
-            echo "✅ Configuring sccache with GitHub Actions backend"
-            echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-            echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-            sccache --show-stats || echo "⚠️ sccache stats unavailable but proceeding"
+            echo "✅ sccache connectivity verified"
           else
-            echo "⚠️ sccache connectivity test failed, likely GitHub Actions cache service issue"
-            echo "🔄 Proceeding without sccache to avoid build failures"
+            echo "⚠️ sccache connectivity test failed, but will retry during build"
           fi
         else
           echo "⚠️ sccache not available, proceeding without sccache"
@@ -115,15 +114,14 @@ jobs:
       run: |
         # Test if sccache is working properly
         if [ "${{ steps.sccache-install.outcome }}" = "success" ] && command -v sccache >/dev/null 2>&1; then
-          # Test sccache connectivity to GitHub Actions cache
+          echo "✅ sccache installed, configuring with GitHub Actions backend"
+          echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          # Test connectivity but don't fail if it doesn't work yet
           if sccache --show-stats >/dev/null 2>&1; then
-            echo "✅ Configuring sccache with GitHub Actions backend"
-            echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-            echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-            sccache --show-stats || echo "⚠️ sccache stats unavailable but proceeding"
+            echo "✅ sccache connectivity verified"
           else
-            echo "⚠️ sccache connectivity test failed, likely GitHub Actions cache service issue"
-            echo "🔄 Proceeding without sccache to avoid build failures"
+            echo "⚠️ sccache connectivity test failed, but will retry during build"
           fi
         else
           echo "⚠️ sccache not available, proceeding without sccache"
