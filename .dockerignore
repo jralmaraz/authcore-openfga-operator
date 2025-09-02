@@ -21,7 +21,8 @@ dist/
 # Dependencies
 node_modules/
 
-# Demo applications (demos/ needed for compilation, examples/ excluded)
+# Demo applications (not needed for container build)
+demos/
 examples/
 
 # Scripts (not needed for container build)
@@ -39,3 +40,18 @@ crds/
 .tmp/
 tmp/
 *.tmp
+
+# Test files (tests/ needed for build verification but not for container)
+tests/
+
+# Shell scripts not needed for build
+*.sh
+
+# Release and optimization documentation  
+OPTIMIZATION_SUMMARY.md
+WORKFLOW_OPTIMIZATION.md
+CACHE_FALLBACK.md
+CHAINGUARD-MIGRATION.md
+ALPHA_USAGE.md
+PODMAN.md
+SECURITY.md
