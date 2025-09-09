@@ -266,91 +266,9 @@ make container-build
 # Load image into Minikube
 minikube image load openfga-operator:latest
 
-# Create namespace for the operator
-kubectl create namespace openfga-system
-
-# Create RBAC resources
-kubectl apply -f - <<EOF
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: openfga-operator
-  namespace: openfga-system
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: openfga-operator
-rules:
-- apiGroups: [""]
-  resources: ["pods", "services", "configmaps", "secrets"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-- apiGroups: ["apps"]
-  resources: ["deployments", "replicasets"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-- apiGroups: ["authorization.openfga.dev"]
-  resources: ["openfgas"]
-  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-- apiGroups: ["authorization.openfga.dev"]
-  resources: ["openfgas/status"]
-  verbs: ["get", "update", "patch"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: openfga-operator
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: ClusterRole
-  name: openfga-operator
-subjects:
-- kind: ServiceAccount
-  name: openfga-operator
-  namespace: openfga-system
-EOF
-
-# Create deployment for the operator
-kubectl apply -f - <<EOF
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: openfga-operator
-  namespace: openfga-system
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: openfga-operator
-  template:
-    metadata:
-      labels:
-        app: openfga-operator
-    spec:
-      serviceAccountName: openfga-operator
-      containers:
-      - name: operator
-        image: openfga-operator:latest
-        imagePullPolicy: Never
-        ports:
-        - containerPort: 8080
-          name: metrics
-        env:
-        - name: RUST_LOG
-          value: "info"
-        resources:
-          limits:
-            memory: "128Mi"
-            cpu: "250m"
-          requests:
-            memory: "64Mi"
-            cpu: "100m"
-        securityContext:
-          allowPrivilegeEscalation: false
-          runAsNonRoot: true
-          capabilities:
-            drop:
-            - ALL
-EOF
+# Deploy the operator with comprehensive RBAC configuration
+# This includes namespace, service account, cluster role, cluster role binding, and deployment
+kubectl apply -f examples/distroless-operator-deployment.yaml
 ```
 
 ## Step 6: Deploy OpenFGA Instances

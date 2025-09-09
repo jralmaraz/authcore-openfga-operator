@@ -27,6 +27,7 @@ define generate-deployment-yaml
 		echo "      labels:"; \
 		echo "        app: openfga-operator"; \
 		echo "    spec:"; \
+		echo "      serviceAccountName: openfga-operator"; \
 		echo "      containers:"; \
 		echo "      - name: operator"; \
 		echo "        image: $(1)"; \
@@ -284,20 +285,16 @@ minikube-load:
 minikube-deploy-registry: install-crds
 	@echo "Deploying to Minikube using registry image..."
 	@echo "Using image: $(IMAGE_REGISTRY):$(IMAGE_TAG)"
-	kubectl create namespace openfga-system --dry-run=client -o yaml | kubectl apply -f -
-	$(eval TEMP_FILE := $(shell mktemp))
-	$(call generate-deployment-yaml,$(IMAGE_REGISTRY):$(IMAGE_TAG),Always,$(TEMP_FILE))
-	kubectl apply -f $(TEMP_FILE)
-	@rm -f $(TEMP_FILE)
+	@echo "Applying RBAC and operator deployment..."
+	@sed 's|image: openfga-operator:latest|image: $(IMAGE_REGISTRY):$(IMAGE_TAG)|g' examples/distroless-operator-deployment.yaml | \
+	sed 's|imagePullPolicy: IfNotPresent|imagePullPolicy: Always|g' | kubectl apply -f -
 
 # Deploy to Minikube using local image (requires image to be built and loaded)
 minikube-deploy-local: minikube-build install-crds
 	@echo "Deploying to Minikube using local image..."
-	kubectl create namespace openfga-system --dry-run=client -o yaml | kubectl apply -f -
-	$(eval TEMP_FILE := $(shell mktemp))
-	$(call generate-deployment-yaml,$(LOCAL_IMAGE_NAME),Never,$(TEMP_FILE))
-	kubectl apply -f $(TEMP_FILE)
-	@rm -f $(TEMP_FILE)
+	@echo "Applying RBAC and operator deployment..."
+	@sed 's|image: openfga-operator:latest|image: $(LOCAL_IMAGE_NAME)|g' examples/distroless-operator-deployment.yaml | \
+	sed 's|imagePullPolicy: IfNotPresent|imagePullPolicy: Never|g' | kubectl apply -f -
 
 # Deploy to Minikube (legacy - uses local build)
 minikube-deploy: minikube-deploy-local
