@@ -63,11 +63,12 @@ jobs:
             exit 0
           fi
           
-          # Test if sccache is working properly and can connect to cache service
+          # Only configure sccache if it's available and can connect to cache service
           if [ "${{ steps.sccache-install.outcome }}" = "success" ] && command -v sccache >/dev/null 2>&1; then
             echo "✅ sccache installed, testing connectivity to GitHub Actions cache..."
-            # Test connectivity BEFORE setting environment variables
-            if sccache --show-stats >/dev/null 2>&1; then
+            
+            # Test if sccache can start without failing - use a controlled environment
+            if SCCACHE_GHA_ENABLED=true timeout 10s sccache --version >/dev/null 2>&1; then
               echo "✅ sccache connectivity verified, enabling for builds"
               echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
               echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
@@ -75,9 +76,12 @@ jobs:
               echo "⚠️ sccache connectivity failed (GitHub cache service may be down)"
               echo "   Continuing build without sccache to ensure reliability"
               echo "   Build will complete successfully but without sccache optimizations"
+              # Explicitly do NOT set RUSTC_WRAPPER so builds use rustc directly
+              echo "SCCACHE_DISABLED=true" >> $GITHUB_ENV
             fi
           else
             echo "⚠️ sccache not available, proceeding without sccache"
+            echo "SCCACHE_DISABLED=true" >> $GITHUB_ENV
           fi
 
       - name: Pre-fetch dependencies
