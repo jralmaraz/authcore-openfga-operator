@@ -63,16 +63,18 @@ jobs:
             exit 0
           fi
           
-          # Test if sccache is working properly
+          # Test if sccache is working properly and can connect to cache service
           if [ "${{ steps.sccache-install.outcome }}" = "success" ] && command -v sccache >/dev/null 2>&1; then
-            echo "✅ sccache installed, configuring with GitHub Actions backend"
-            echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-            echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-            # Test connectivity but don't fail if it doesn't work yet
+            echo "✅ sccache installed, testing connectivity to GitHub Actions cache..."
+            # Test connectivity BEFORE setting environment variables
             if sccache --show-stats >/dev/null 2>&1; then
-              echo "✅ sccache connectivity verified"
+              echo "✅ sccache connectivity verified, enabling for builds"
+              echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
+              echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
             else
-              echo "⚠️ sccache connectivity test failed, but will retry during build"
+              echo "⚠️ sccache connectivity failed (GitHub cache service may be down)"
+              echo "   Continuing build without sccache to ensure reliability"
+              echo "   Build will complete successfully but without sccache optimizations"
             fi
           else
             echo "⚠️ sccache not available, proceeding without sccache"
