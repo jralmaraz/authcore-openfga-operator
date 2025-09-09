@@ -1,3 +1,85 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openfga-system
+  labels:
+    name: openfga-system
+    app.kubernetes.io/name: openfga-system
+    app.kubernetes.io/part-of: openfga-operator
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openfga-operator
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: operator
+automountServiceAccountToken: true
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: openfga-operator
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: operator
+rules:
+# Core resources
+- apiGroups: [""]
+  resources: ["pods", "services", "configmaps", "secrets", "events"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch"]
+# Apps resources
+- apiGroups: ["apps"]
+  resources: ["deployments", "replicasets", "statefulsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# OpenFGA CRD
+- apiGroups: ["authorization.openfga.dev"]
+  resources: ["openfgas"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["authorization.openfga.dev"]
+  resources: ["openfgas/status", "openfgas/finalizers"]
+  verbs: ["get", "update", "patch"]
+# Networking
+- apiGroups: ["networking.k8s.io"]
+  resources: ["networkpolicies", "ingresses"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Admission controllers
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources: ["validatingadmissionwebhooks", "mutatingadmissionwebhooks"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Storage
+- apiGroups: ["storage.k8s.io"]
+  resources: ["storageclasses"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["persistentvolumes", "persistentvolumeclaims"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Monitoring
+- apiGroups: ["monitoring.coreos.com"]
+  resources: ["servicemonitors", "prometheusrules"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openfga-operator
+  labels:
+    app.kubernetes.io/name: openfga-operator
+    app.kubernetes.io/component: operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: openfga-operator
+subjects:
+- kind: ServiceAccount
+  name: openfga-operator
+  namespace: openfga-system
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,6 +97,7 @@ spec:
       labels:
         app: openfga-operator
     spec:
+      serviceAccountName: openfga-operator
       securityContext:
         runAsNonRoot: true
         runAsUser: 65532
