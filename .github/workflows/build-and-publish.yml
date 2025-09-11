@@ -11,13 +11,6 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  # Cache fallback configuration
-  # Uncomment the line below to disable all caching during GitHub Actions outages:
-  # DISABLE_CACHE: true
-  
-  # Cache outage recovery mode:
-  # Set DISABLE_CACHE=true in your repository secrets or environment variables
-  # if you need to bypass caching due to widespread GitHub Actions issues
 
 jobs:
   build:
@@ -33,12 +26,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.5
-        continue-on-error: true
-        id: sccache-install
-
-      - name: Cache cargo registry and sccache
+      - name: Cache cargo registry
         uses: actions/cache@v4
         continue-on-error: true
         id: cache-cargo
@@ -53,87 +41,6 @@ jobs:
             ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-
             ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}-
             ${{ runner.os }}-cargo-
-
-      - name: Configure sccache with robust fallback
-        run: |
-          # Global environment for cache bypass during outages
-          if [ "${{ env.DISABLE_CACHE }}" = "true" ]; then
-            echo "🚫 Cache manually disabled via DISABLE_CACHE environment variable"
-            echo "DISABLE_CACHE=true" >> $GITHUB_ENV
-            echo "CACHE_STATUS=disabled" >> $GITHUB_ENV
-            exit 0
-          fi
-          
-          # Test cache connectivity before configuring sccache
-          test_cache_connectivity() {
-            local test_result=0
-            
-            # Test GitHub Actions cache connectivity with timeout
-            if command -v sccache >/dev/null 2>&1; then
-              echo "Testing sccache connectivity..."
-              
-              # Create a temporary test environment
-              export SCCACHE_GHA_ENABLED=true
-              export RUSTC_WRAPPER=sccache
-              
-              # Test with a simple command and timeout
-              timeout 30s sccache --show-stats >/dev/null 2>&1 || test_result=1
-              
-              # Additional connectivity test - try to start the server
-              if [ $test_result -eq 0 ]; then
-                timeout 15s sccache --start-server >/dev/null 2>&1 || test_result=1
-              fi
-              
-              # Clean up test environment
-              unset SCCACHE_GHA_ENABLED RUSTC_WRAPPER
-              sccache --stop-server >/dev/null 2>&1 || true
-            else
-              test_result=1
-            fi
-            
-            return $test_result
-          }
-          
-          # Attempt cache configuration with fallback hierarchy
-          if [ "${{ steps.sccache-install.outcome }}" = "success" ]; then
-            if test_cache_connectivity; then
-              echo "✅ GitHub Actions cache connectivity verified - using sccache with GHA backend"
-              echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-              echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-              echo "CACHE_STATUS=gha" >> $GITHUB_ENV
-            else
-              echo "⚠️  GitHub Actions cache connectivity failed - attempting local sccache fallback"
-              # Try local sccache as fallback
-              mkdir -p $HOME/.cache/sccache
-              export SCCACHE_DIR=$HOME/.cache/sccache
-              export SCCACHE_CACHE_SIZE=2G
-              export RUSTC_WRAPPER=sccache
-              
-              if timeout 15s sccache --show-stats >/dev/null 2>&1; then
-                echo "✅ Local sccache fallback successful"
-                echo "SCCACHE_DIR=$HOME/.cache/sccache" >> $GITHUB_ENV
-                echo "SCCACHE_CACHE_SIZE=2G" >> $GITHUB_ENV
-                echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-                echo "CACHE_STATUS=local" >> $GITHUB_ENV
-              else
-                echo "❌ Local sccache also failed - building without cache"
-                echo "DISABLE_CACHE=true" >> $GITHUB_ENV
-                echo "CACHE_STATUS=failed" >> $GITHUB_ENV
-              fi
-              
-              # Clean up test environment
-              unset SCCACHE_DIR SCCACHE_CACHE_SIZE RUSTC_WRAPPER
-              sccache --stop-server >/dev/null 2>&1 || true
-            fi
-          else
-            echo "❌ sccache installation failed - building without cache"
-            echo "DISABLE_CACHE=true" >> $GITHUB_ENV
-            echo "CACHE_STATUS=no_sccache" >> $GITHUB_ENV
-          fi
-          
-          echo "Final cache status: ${{ env.CACHE_STATUS || 'unknown' }}"
-          echo "sccache-install outcome: ${{ steps.sccache-install.outcome }}"
-          echo "cargo-cache outcome: ${{ steps.cache-cargo.outcome }}"
 
       - name: Pre-fetch dependencies
         run: |
@@ -161,66 +68,15 @@ jobs:
         id: extract_version
         uses: ./.github/actions/extract-version
 
-      - name: Build container image (status check) with error handling
+      - name: Build container image (status check)
         run: |
-          # Function to build with error handling and fallback
-          build_with_fallback() {
-            local attempt=1
-            local max_attempts=2
-            
-            while [ $attempt -le $max_attempts ]; do
-              echo "Build attempt $attempt/$max_attempts..."
-              
-              # Set build args based on cache status
-              if [ "${{ env.DISABLE_CACHE }}" = "true" ]; then
-                echo "Building without cache (attempt $attempt)"
-                build_args="BUILDKIT_INLINE_CACHE=1 VERSION=${{ steps.extract_version.outputs.cargo_version }} DISABLE_CACHE=true"
-              else
-                echo "Building with cache enabled (attempt $attempt)"
-                build_args="BUILDKIT_INLINE_CACHE=1 VERSION=${{ steps.extract_version.outputs.cargo_version }} SCCACHE_GHA_ENABLED=${{ env.SCCACHE_GHA_ENABLED || 'false' }} RUSTC_WRAPPER=${{ env.RUSTC_WRAPPER || '' }} DISABLE_CACHE=${{ env.DISABLE_CACHE || 'false' }}"
-              fi
-              
-              # Attempt build with timeout
-              if timeout 1800s docker buildx build \
-                --platform ${{ startsWith(github.ref, 'refs/tags/v') && 'linux/amd64,linux/arm64' || 'linux/amd64' }} \
-                --cache-from type=gha \
-                --cache-from type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache \
-                --cache-to type=gha,mode=max \
-                --cache-to type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max \
-                --build-arg $build_args \
-                --tag temp-build-check \
-                . 2>&1 | tee build-log-$attempt.txt; then
-                echo "✅ Build successful on attempt $attempt"
-                return 0
-              else
-                echo "❌ Build failed on attempt $attempt"
-                
-                # Check if it's a cache-related error
-                if grep -q "cache\|sccache\|400.*Bad Request" build-log-$attempt.txt; then
-                  echo "Detected cache-related error, disabling cache for retry"
-                  echo "DISABLE_CACHE=true" >> $GITHUB_ENV
-                  echo "CACHE_STATUS=build_failure_fallback" >> $GITHUB_ENV
-                  unset RUSTC_WRAPPER SCCACHE_GHA_ENABLED
-                  # Stop any running sccache server
-                  sccache --stop-server >/dev/null 2>&1 || true
-                elif [ $attempt -eq $max_attempts ]; then
-                  echo "❌ Build failed after $max_attempts attempts"
-                  echo "Build logs:"
-                  cat build-log-$attempt.txt
-                  return 1
-                fi
-                
-                attempt=$((attempt + 1))
-                echo "Retrying in 30 seconds..."
-                sleep 30
-              fi
-            done
-            
-            return 1
-          }
-          
-          # Execute build with fallback logic
-          build_with_fallback
+          docker buildx build \
+            --platform ${{ startsWith(github.ref, 'refs/tags/v') && 'linux/amd64,linux/arm64' || 'linux/amd64' }} \
+            --cache-from type=gha \
+            --cache-to type=gha,mode=max \
+            --build-arg VERSION=${{ steps.extract_version.outputs.cargo_version }} \
+            --tag temp-build-check \
+            .
 
   publish:
     runs-on: ubuntu-latest
@@ -387,16 +243,11 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: |
             type=gha
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
           cache-to: |
             type=gha,mode=max
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
           build-args: |
             BUILDKIT_INLINE_CACHE=1
             VERSION=${{ steps.final_version.outputs.version }}
-            SCCACHE_GHA_ENABLED=${{ env.SCCACHE_GHA_ENABLED || 'false' }}
-            RUSTC_WRAPPER=${{ env.RUSTC_WRAPPER || '' }}
-            DISABLE_CACHE=${{ env.DISABLE_CACHE || 'false' }}
 
       - name: Generate build summary
         run: |
