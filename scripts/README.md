@@ -258,7 +258,7 @@ kubectl logs -l app=openfga -f
 2. **OpenFGA not accessible**: Check if OpenFGA service is running
    ```bash
    kubectl get services -l app=openfga
-   kubectl port-forward service/openfga-basic-http 8080:8080
+   kubectl port-forward service/openfga-basic 8080:8080
    ```
 
 3. **Permission denied**: Ensure scripts are executable

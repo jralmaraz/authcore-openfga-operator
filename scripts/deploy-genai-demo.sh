@@ -306,16 +306,21 @@ setup_openfga_store() {
     
     # First try to find operator-managed service
     if kubectl get openfgas.authorization.openfga.dev openfga-basic >/dev/null 2>&1; then
-        # Look for the HTTP service created by the operator
-        openfga_service=$(kubectl get services -l app.kubernetes.io/name=openfga,app.kubernetes.io/instance=openfga-basic --no-headers 2>/dev/null | grep http | head -1 | awk '{print $1}')
+        # Look for the service created by the operator (should be named 'openfga-basic')
+        openfga_service=$(kubectl get services -l app.kubernetes.io/name=openfga,app.kubernetes.io/instance=openfga-basic --no-headers 2>/dev/null | head -1 | awk '{print $1}')
         
-        # If not found, try the standard naming pattern
+        # If not found, try the fallback labels
         if [ -z "$openfga_service" ]; then
-            openfga_service="openfga-basic-http"
+            openfga_service=$(kubectl get services -l app=openfga,instance=openfga-basic --no-headers 2>/dev/null | head -1 | awk '{print $1}')
+        fi
+        
+        # If still not found, try the expected service name without -http suffix
+        if [ -z "$openfga_service" ]; then
+            openfga_service="openfga-basic"
         fi
     else
-        # Fall back to looking for basic service
-        openfga_service="openfga-basic-http"
+        # Fall back to looking for basic service (without -http suffix)
+        openfga_service="openfga-basic"
     fi
     
     # Verify the service exists
