@@ -202,9 +202,47 @@ setup_openfga_store() {
     
     cd "$BANKING_DEMO_DIR"
     
+    # Find the OpenFGA service
+    local openfga_service=""
+    
+    # First try to find operator-managed service
+    if kubectl get openfgas.authorization.openfga.dev openfga-basic >/dev/null 2>&1; then
+        # Look for the service created by the operator (should be named 'openfga-basic')
+        openfga_service=$(kubectl get services -l app.kubernetes.io/name=openfga,app.kubernetes.io/instance=openfga-basic --no-headers 2>/dev/null | head -1 | awk '{print $1}')
+        
+        # If not found, try the fallback labels
+        if [ -z "$openfga_service" ]; then
+            openfga_service=$(kubectl get services -l app=openfga,instance=openfga-basic --no-headers 2>/dev/null | head -1 | awk '{print $1}')
+        fi
+        
+        # If still not found, try the expected service name
+        if [ -z "$openfga_service" ]; then
+            openfga_service="openfga-basic"
+        fi
+    else
+        # Fall back to looking for basic service
+        openfga_service="openfga-basic"
+    fi
+    
+    # Verify the service exists
+    if ! kubectl get service "$openfga_service" >/dev/null 2>&1; then
+        log_warning "Could not find OpenFGA service: $openfga_service"
+        log_info "Looking for any OpenFGA service..."
+        
+        # Try to find any OpenFGA service
+        openfga_service=$(kubectl get services -l app=openfga --no-headers 2>/dev/null | head -1 | awk '{print $1}')
+        
+        if [ -z "$openfga_service" ]; then
+            log_error "No OpenFGA service found. Please ensure OpenFGA is deployed correctly."
+            return 1
+        fi
+        
+        log_info "Found OpenFGA service: $openfga_service"
+    fi
+    
     # Port-forward to OpenFGA in background
-    log_info "Setting up port-forward to OpenFGA..."
-    kubectl port-forward service/openfga-basic-http 8080:8080 >/dev/null 2>&1 &
+    log_info "Setting up port-forward to OpenFGA service: $openfga_service"
+    kubectl port-forward "service/$openfga_service" 8080:8080 >/dev/null 2>&1 &
     local port_forward_pid=$!
     
     # Give port-forward time to establish

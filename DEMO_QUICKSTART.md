@@ -160,7 +160,7 @@ kubectl logs -l app=openfga -f
 3. **OpenFGA not accessible**: Check OpenFGA deployment
    ```bash
    kubectl get pods -l app=openfga
-   kubectl port-forward service/openfga-basic-http 8080:8080
+   kubectl port-forward service/openfga-basic 8080:8080
    ```
 
 ## Cleanup

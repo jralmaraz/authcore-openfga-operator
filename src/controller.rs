@@ -382,6 +382,8 @@ fn create_deployment(openfga: &OpenFGA, ns: &str, name: &str) -> ControllerResul
 
     let labels = BTreeMap::from([
         ("app".to_string(), "openfga".to_string()),
+        ("app.kubernetes.io/name".to_string(), "openfga".to_string()),
+        ("app.kubernetes.io/instance".to_string(), name.to_string()),
         ("instance".to_string(), name.to_string()),
     ]);
 
@@ -481,6 +483,8 @@ fn create_service(openfga: &OpenFGA, ns: &str, name: &str) -> ControllerResult<S
 
     let labels = BTreeMap::from([
         ("app".to_string(), "openfga".to_string()),
+        ("app.kubernetes.io/name".to_string(), "openfga".to_string()),
+        ("app.kubernetes.io/instance".to_string(), name.to_string()),
         ("instance".to_string(), name.to_string()),
     ]);
 
