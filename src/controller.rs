@@ -39,17 +39,15 @@ impl OpenFGAController {
     pub async fn run(self) -> Result<()> {
         let client = self.client.clone();
         let openfgas: Api<OpenFGA> = Api::all(client.clone());
-        let deployments: Api<Deployment> = Api::all(client.clone());
-        let services: Api<Service> = Api::all(client.clone());
 
         info!(
             controller = "openfga-controller",
-            "Starting controller with resource monitoring"
+            "Starting controller with OpenFGA resource monitoring"
         );
 
         debug!(
-            resources = "OpenFGA, Deployment, Service",
-            "Controller watching resources"
+            resources = "OpenFGA",
+            "Controller watching OpenFGA resources only"
         );
 
         // Test Kubernetes API connectivity before starting controller
@@ -69,10 +67,9 @@ impl OpenFGAController {
             }
         }
 
+        // Only watch OpenFGA resources, not owned Deployments/Services
+        // The reconcile function will manage owned resources directly
         Controller::new(openfgas, Config::default().any_semantic())
-            .owns(deployments, Config::default())
-            .owns(services, Config::default())
-            .shutdown_on_signal()
             .run(reconcile, error_policy, Arc::new(self))
             .for_each(|res| async move {
                 match res {
@@ -644,69 +641,80 @@ fn error_policy(
     let requeue_duration = match error {
         ControllerError::Kube(kube_error) => {
             // More intelligent error handling based on kube-rs patterns
-            if kube_error.to_string().contains("NotFound") {
+            let error_str = kube_error.to_string().to_lowercase();
+
+            if error_str.contains("notfound") || error_str.contains("not found") {
                 info!(
                     namespace = %ns,
                     resource_name = %name,
                     error_type = "NotFound",
+                    error_detail = %kube_error,
                     "Resource not found, fast retry for creation"
                 );
                 Duration::from_secs(5)
-            } else if kube_error.to_string().contains("Conflict") {
+            } else if error_str.contains("conflict") || error_str.contains("version") {
                 info!(
                     namespace = %ns,
                     resource_name = %name,
                     error_type = "Conflict",
-                    "Resource conflict, immediate retry"
+                    error_detail = %kube_error,
+                    "Resource conflict or version mismatch, immediate retry"
                 );
                 Duration::from_secs(1)
-            } else if kube_error.to_string().contains("Forbidden")
-                || kube_error.to_string().contains("Unauthorized")
-            {
+            } else if error_str.contains("forbidden") || error_str.contains("unauthorized") {
                 warn!(
                     namespace = %ns,
                     resource_name = %name,
                     error_type = "Permission",
-                    "Permission error, longer retry interval"
+                    error_detail = %kube_error,
+                    "Permission error, longer retry interval - check RBAC configuration"
                 );
                 Duration::from_secs(300) // 5 minutes for permission issues
-            } else if kube_error.to_string().contains("TooManyRequests")
-                || kube_error.to_string().contains("throttled")
-            {
+            } else if error_str.contains("toomanyrequests") || error_str.contains("throttled") {
                 warn!(
                     namespace = %ns,
                     resource_name = %name,
                     error_type = "RateLimit",
-                    "Rate limited, backing off"
+                    error_detail = %kube_error,
+                    "Rate limited by Kubernetes API, backing off"
                 );
                 Duration::from_secs(60) // 1 minute for rate limiting
-            } else if kube_error.to_string().contains("timeout")
-                || kube_error.to_string().contains("connection")
-            {
+            } else if error_str.contains("timeout") || error_str.contains("connection") {
                 warn!(
                     namespace = %ns,
                     resource_name = %name,
                     error_type = "Network",
-                    "Network issue, standard retry"
+                    error_detail = %kube_error,
+                    "Network connectivity issue, retrying"
                 );
                 Duration::from_secs(30)
+            } else if error_str.contains("event queue") {
+                error!(
+                    namespace = %ns,
+                    resource_name = %name,
+                    error_type = "EventQueue",
+                    error_detail = %kube_error,
+                    "Event queue error detected - this should be resolved by the controller fixes"
+                );
+                Duration::from_secs(10) // Quick retry for event queue issues
             } else {
                 warn!(
                     namespace = %ns,
                     resource_name = %name,
                     error_type = "Unknown",
-                    error_message = %kube_error,
-                    "Unknown Kubernetes error, standard retry"
+                    error_detail = %kube_error,
+                    "Unknown Kubernetes API error, using standard retry"
                 );
                 Duration::from_secs(30)
             }
         }
-        ControllerError::Serialization(_) => {
+        ControllerError::Serialization(ser_error) => {
             error!(
                 namespace = %ns,
                 resource_name = %name,
                 error_type = "Serialization",
-                "Serialization error, longer retry interval"
+                error_detail = %ser_error,
+                "JSON serialization/deserialization error, longer retry interval"
             );
             Duration::from_secs(120)
         }
