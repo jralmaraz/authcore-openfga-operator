@@ -638,7 +638,7 @@ fn error_policy(
         ControllerError::Kube(kube_error) => {
             // More intelligent error handling based on kube-rs patterns
             let error_str = kube_error.to_string().to_lowercase();
-            
+
             if error_str.contains("notfound") || error_str.contains("not found") {
                 info!(
                     namespace = %ns,
