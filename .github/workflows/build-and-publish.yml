@@ -11,13 +11,6 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  # Cache fallback configuration
-  # Uncomment the line below to disable all caching during GitHub Actions outages:
-  # DISABLE_CACHE: true
-  
-  # Cache outage recovery mode:
-  # Set DISABLE_CACHE=true in your repository secrets or environment variables
-  # if you need to bypass caching due to widespread GitHub Actions issues
 
 jobs:
   build:
@@ -33,12 +26,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Install sccache
-        uses: mozilla-actions/sccache-action@v0.0.5
-        continue-on-error: true
-        id: sccache-install
-
-      - name: Cache cargo registry and sccache
+      - name: Cache cargo registry
         uses: actions/cache@v4
         continue-on-error: true
         id: cache-cargo
@@ -53,36 +41,6 @@ jobs:
             ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}-
             ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.toml') }}-
             ${{ runner.os }}-cargo-
-
-      - name: Configure sccache
-        run: |
-          # Simple cache configuration - let sccache handle fallbacks internally
-          if [ "${{ env.DISABLE_CACHE }}" = "true" ]; then
-            echo "🚫 Cache manually disabled via DISABLE_CACHE environment variable"
-            echo "DISABLE_CACHE=true" >> $GITHUB_ENV
-            exit 0
-          fi
-          
-          # Only configure sccache if it's available and can connect to cache service
-          if [ "${{ steps.sccache-install.outcome }}" = "success" ] && command -v sccache >/dev/null 2>&1; then
-            echo "✅ sccache installed, testing connectivity to GitHub Actions cache..."
-            
-            # Test if sccache can start without failing - use a controlled environment
-            if SCCACHE_GHA_ENABLED=true timeout 10s sccache --version >/dev/null 2>&1; then
-              echo "✅ sccache connectivity verified, enabling for builds"
-              echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-              echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-            else
-              echo "⚠️ sccache connectivity failed (GitHub cache service may be down)"
-              echo "   Continuing build without sccache to ensure reliability"
-              echo "   Build will complete successfully but without sccache optimizations"
-              # Explicitly do NOT set RUSTC_WRAPPER so builds use rustc directly
-              echo "SCCACHE_DISABLED=true" >> $GITHUB_ENV
-            fi
-          else
-            echo "⚠️ sccache not available, proceeding without sccache"
-            echo "SCCACHE_DISABLED=true" >> $GITHUB_ENV
-          fi
 
       - name: Pre-fetch dependencies
         run: |
@@ -117,9 +75,6 @@ jobs:
             --cache-from type=gha \
             --cache-to type=gha,mode=max \
             --build-arg VERSION=${{ steps.extract_version.outputs.cargo_version }} \
-            --build-arg SCCACHE_GHA_ENABLED=${{ env.SCCACHE_GHA_ENABLED || 'false' }} \
-            --build-arg RUSTC_WRAPPER=${{ env.RUSTC_WRAPPER || '' }} \
-            --build-arg DISABLE_CACHE=${{ env.DISABLE_CACHE || 'false' }} \
             --tag temp-build-check \
             .
 
@@ -293,9 +248,6 @@ jobs:
           build-args: |
             BUILDKIT_INLINE_CACHE=1
             VERSION=${{ steps.final_version.outputs.version }}
-            SCCACHE_GHA_ENABLED=${{ env.SCCACHE_GHA_ENABLED || 'false' }}
-            RUSTC_WRAPPER=${{ env.RUSTC_WRAPPER || '' }}
-            DISABLE_CACHE=${{ env.DISABLE_CACHE || 'false' }}
 
       - name: Generate build summary
         run: |

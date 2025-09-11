@@ -29,11 +29,6 @@ jobs:
         toolchain: ${{ matrix.rust }}
         components: ${{ matrix.check_fmt && 'rustfmt' || '' }}${{ matrix.check_clippy && matrix.check_fmt && ',' || '' }}${{ matrix.check_clippy && 'clippy' || '' }}
     
-    - name: Install sccache
-      uses: mozilla-actions/sccache-action@v0.0.5
-      continue-on-error: true
-      id: sccache-install
-    
     - name: Cache cargo registry and dependencies
       uses: actions/cache@v4
       continue-on-error: true
@@ -49,29 +44,6 @@ jobs:
           ${{ runner.os }}-${{ matrix.rust }}-cargo-test-
           ${{ runner.os }}-${{ matrix.rust }}-cargo-
           ${{ runner.os }}-cargo-
-    
-    - name: Configure sccache
-      run: |
-        # Only configure sccache if it's available and can connect to cache service
-        if [ "${{ steps.sccache-install.outcome }}" = "success" ] && command -v sccache >/dev/null 2>&1; then
-          echo "✅ sccache installed, testing connectivity to GitHub Actions cache..."
-          
-          # Test if sccache can start without failing - use a controlled environment
-          if SCCACHE_GHA_ENABLED=true timeout 10s sccache --version >/dev/null 2>&1; then
-            echo "✅ sccache connectivity verified, enabling for builds"
-            echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-            echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-          else
-            echo "⚠️ sccache connectivity failed (GitHub cache service may be down)"
-            echo "   Continuing build without sccache to ensure reliability"
-            echo "   Build will complete successfully but without sccache optimizations"
-            # Explicitly do NOT set RUSTC_WRAPPER so builds use rustc directly
-            echo "SCCACHE_DISABLED=true" >> $GITHUB_ENV
-          fi
-        else
-          echo "⚠️ sccache not available, proceeding without sccache"
-          echo "SCCACHE_DISABLED=true" >> $GITHUB_ENV
-        fi
     
     - name: Check formatting
       if: matrix.check_fmt
@@ -96,11 +68,6 @@ jobs:
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
     
-    - name: Install sccache
-      uses: mozilla-actions/sccache-action@v0.0.5
-      continue-on-error: true
-      id: sccache-install
-    
     - name: Cache cargo registry and dependencies
       uses: actions/cache@v4
       continue-on-error: true
@@ -115,29 +82,6 @@ jobs:
           ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}-
           ${{ runner.os }}-cargo-build-
           ${{ runner.os }}-cargo-
-    
-    - name: Configure sccache
-      run: |
-        # Only configure sccache if it's available and can connect to cache service
-        if [ "${{ steps.sccache-install.outcome }}" = "success" ] && command -v sccache >/dev/null 2>&1; then
-          echo "✅ sccache installed, testing connectivity to GitHub Actions cache..."
-          
-          # Test if sccache can start without failing - use a controlled environment
-          if SCCACHE_GHA_ENABLED=true timeout 10s sccache --version >/dev/null 2>&1; then
-            echo "✅ sccache connectivity verified, enabling for builds"
-            echo "SCCACHE_GHA_ENABLED=true" >> $GITHUB_ENV
-            echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
-          else
-            echo "⚠️ sccache connectivity failed (GitHub cache service may be down)"
-            echo "   Continuing build without sccache to ensure reliability"
-            echo "   Build will complete successfully but without sccache optimizations"
-            # Explicitly do NOT set RUSTC_WRAPPER so builds use rustc directly
-            echo "SCCACHE_DISABLED=true" >> $GITHUB_ENV
-          fi
-        else
-          echo "⚠️ sccache not available, proceeding without sccache"
-          echo "SCCACHE_DISABLED=true" >> $GITHUB_ENV
-        fi
     
     - name: Run build check
       run: make build
