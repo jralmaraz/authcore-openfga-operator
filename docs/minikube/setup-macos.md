@@ -403,7 +403,30 @@ minikube delete && minikube start
 
 ## Cleanup
 
-When you're done testing:
+When you're done testing, you have two options for cleanup:
+
+### Option 1: Automated Cleanup (Recommended)
+
+Use the comprehensive cleanup script that handles all operator resources:
+
+```bash
+# Complete cleanup with confirmation
+scripts/minikube/cleanup-operator.sh
+
+# Quick cleanup without confirmation
+scripts/minikube/cleanup-operator.sh --force
+
+# Cleanup but keep CRDs for faster re-deployment
+scripts/minikube/cleanup-operator.sh --keep-crds
+
+# Preview what would be deleted
+scripts/minikube/cleanup-operator.sh --dry-run
+
+# Show current status
+scripts/minikube/cleanup-operator.sh --status
+```
+
+### Option 2: Manual Cleanup
 
 ```bash
 # Delete OpenFGA instances
@@ -424,6 +447,8 @@ minikube stop
 # Delete Minikube cluster (optional)
 minikube delete
 ```
+
+The automated cleanup script provides better error handling, comprehensive resource removal, and additional options for different cleanup scenarios.
 
 ## Next Steps
 

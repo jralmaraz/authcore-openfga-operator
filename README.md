@@ -385,6 +385,55 @@ For detailed information, see:
 - **[Banking Demo Details](demos/banking-app/README.md)**
 - **[GenAI RAG Demo Details](demos/genai-rag-agent/README.md)**
 
+## Cleanup and Uninstallation
+
+When you need to completely remove the OpenFGA operator and all its resources from your cluster, use the comprehensive cleanup script:
+
+### Automated Cleanup (Recommended)
+
+```bash
+# Complete cleanup with confirmation prompt
+scripts/minikube/cleanup-operator.sh
+
+# Quick cleanup without confirmation
+scripts/minikube/cleanup-operator.sh --force
+
+# Cleanup but keep CRDs for faster re-deployment
+scripts/minikube/cleanup-operator.sh --keep-crds
+
+# Preview what would be deleted (dry run)
+scripts/minikube/cleanup-operator.sh --dry-run
+
+# Show current operator resource status
+scripts/minikube/cleanup-operator.sh --status
+```
+
+### What Gets Cleaned Up
+
+The cleanup script removes:
+- ✅ All OpenFGA custom resources (instances)
+- ✅ Demo applications (banking-app, genai-rag-agent)
+- ✅ Operator deployment and services
+- ✅ ServiceAccount, ClusterRole, ClusterRoleBinding
+- ✅ openfga-system namespace (optional)
+- ✅ OpenFGA CRDs (optional)
+- ✅ Running port-forwards
+
+### Selective Cleanup Options
+
+```bash
+# Keep namespace for faster re-deployment
+scripts/minikube/cleanup-operator.sh --keep-namespace
+
+# Skip demo cleanup (operator only)
+scripts/minikube/cleanup-operator.sh --skip-demos
+
+# Keep both namespace and CRDs
+scripts/minikube/cleanup-operator.sh --keep-crds --keep-namespace
+```
+
+This automated approach ensures complete cleanup with proper error handling and provides options for different scenarios, from complete removal to selective cleanup for development workflows.
+
 ## Security Implementation
 
 ### Admission Controller Setup

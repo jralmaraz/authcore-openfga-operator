@@ -62,6 +62,54 @@ CONTAINER_RUNTIME=podman ./scripts/deploy-demos.sh
 
 ## Script Details
 
+### cleanup-operator.sh (OpenFGA Operator Cleanup)
+
+**Location:** `scripts/minikube/cleanup-operator.sh`
+
+Comprehensive cleanup script that removes all OpenFGA operator resources from the cluster.
+
+**Features:**
+- Removes all OpenFGA custom resources and instances
+- Cleans up demo applications (banking, genai-rag)
+- Deletes operator deployment, services, and RBAC resources
+- Removes openfga-system namespace (optional)
+- Uninstalls Custom Resource Definitions (optional)
+- Stops running port-forwards
+- Provides dry-run mode and status checking
+- Supports selective cleanup options
+
+**Usage:**
+```bash
+./scripts/minikube/cleanup-operator.sh [OPTIONS]
+
+Options:
+  --keep-crds          Do not delete Custom Resource Definitions
+  --keep-namespace     Do not delete the openfga-system namespace
+  --skip-demos         Do not clean up demo applications
+  --force              Skip confirmation prompt
+  --dry-run            Show what would be deleted without actually deleting
+  --status             Show current status of OpenFGA resources
+  --help               Show help message
+```
+
+**Examples:**
+```bash
+# Complete cleanup with confirmation
+./scripts/minikube/cleanup-operator.sh
+
+# Quick cleanup without confirmation
+./scripts/minikube/cleanup-operator.sh --force
+
+# Keep CRDs for faster re-deployment
+./scripts/minikube/cleanup-operator.sh --keep-crds
+
+# Preview cleanup without changes
+./scripts/minikube/cleanup-operator.sh --dry-run
+
+# Check current resource status
+./scripts/minikube/cleanup-operator.sh --status
+```
+
 ### deploy-demos.sh (Unified Script)
 
 The main script that can deploy both demo applications together or individually.
