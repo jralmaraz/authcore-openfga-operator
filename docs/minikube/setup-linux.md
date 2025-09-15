@@ -283,10 +283,28 @@ kubectl apply -f examples/basic-openfga.yaml
 kubectl wait --for=condition=available --timeout=300s deployment/openfga-basic
 ```
 
-### Deploy PostgreSQL-backed OpenFGA Instance (Optional)
+### Deploy PostgreSQL-backed OpenFGA Instance (Vault-Managed Secrets - Recommended)
 
 ```bash
-# First deploy PostgreSQL
+# Deploy Vault-managed PostgreSQL and OpenFGA
+kubectl apply -k kustomize/base/vault/
+
+# Initialize Vault with demo secrets
+kubectl port-forward -n openfga-system svc/vault 8200:8200 &
+export VAULT_ADDR=http://localhost:8200
+export VAULT_TOKEN=root
+./scripts/init-vault.sh
+
+# Deploy OpenFGA with Vault secrets
+kubectl apply -f examples/postgres-openfga-vault.yaml
+```
+
+### Deploy PostgreSQL-backed OpenFGA Instance (Legacy - Manual Secrets)
+
+⚠️ **SECURITY WARNING**: This approach uses hardcoded passwords and is NOT recommended for any environment. Use the Vault-managed approach above instead.
+
+```bash
+# First deploy PostgreSQL with manual secrets (NOT RECOMMENDED)
 kubectl apply -f - <<EOF
 apiVersion: apps/v1
 kind: Deployment
@@ -312,7 +330,7 @@ spec:
         - name: POSTGRES_USER
           value: postgres
         - name: POSTGRES_PASSWORD
-          value: password
+          value: CHANGE_ME_INSECURE_PASSWORD  # ⚠️ CHANGE THIS!
         ports:
         - containerPort: 5432
         volumeMounts:

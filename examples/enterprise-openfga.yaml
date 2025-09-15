@@ -14,7 +14,9 @@ spec:
   image: "openfga/openfga:v1.5.0"
   datastore:
     engine: "postgres"
-    uri: "postgresql://openfga-user:secure-password@postgresql:5432/openfga?sslmode=require"
+    # SECURITY NOTE: Replace with secret-managed URI
+    # Example: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql:5432/$(POSTGRES_DB)?sslmode=require"
+    uri: "postgresql://openfga-user:CHANGE_ME_SECURE_PASSWORD@postgresql:5432/openfga?sslmode=require"
   playground:
     enabled: false
   grpc:
