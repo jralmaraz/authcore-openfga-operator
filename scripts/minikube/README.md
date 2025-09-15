@@ -51,6 +51,9 @@ For Kubernetes-native deployment with Minikube:
 # Prerequisites: Ensure operator is deployed
 ./scripts/minikube/deploy-operator.sh
 
+# Or deploy operator with PostgreSQL datastore
+./scripts/minikube/deploy-operator-postgres.sh
+
 # Deploy all demo applications
 ./scripts/minikube/deploy-demos.sh
 
@@ -94,6 +97,25 @@ For Windows users with PowerShell:
 .\scripts\minikube\deploy-demos.ps1 -SkipBuild  # Skip image building
 .\scripts\minikube\deploy-demos.ps1 -SkipSetup  # Skip demo data setup
 ```
+
+### 🗄️ PostgreSQL-backed OpenFGA Deployment
+
+For deploying OpenFGA with PostgreSQL datastore support:
+
+```bash
+# Deploy operator with PostgreSQL automatically
+./scripts/minikube/deploy-operator-postgres.sh
+
+# Deploy only PostgreSQL (if operator is already deployed)
+./scripts/minikube/deploy-operator-postgres.sh --skip-operator
+```
+
+This script:
+- Checks prerequisites (minikube, kubectl, optional Docker/Podman)
+- Creates the `openfga-system` namespace if needed
+- Deploys PostgreSQL 14 with OpenFGA configuration
+- Deploys the OpenFGA operator (unless `--skip-operator`)
+- Provides PostgreSQL connection details and next steps
 
 ## Testing and Validation
 
