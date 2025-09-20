@@ -103,19 +103,31 @@ For Windows users with PowerShell:
 For deploying OpenFGA with PostgreSQL datastore support:
 
 ```bash
-# Deploy operator with PostgreSQL automatically
+# Deploy operator with PostgreSQL automatically (recommended - uses Vault for secrets)
 ./scripts/minikube/deploy-operator-postgres.sh
 
 # Deploy only PostgreSQL (if operator is already deployed)
 ./scripts/minikube/deploy-operator-postgres.sh --skip-operator
 ```
 
+**🔐 Security Features:**
+- **Automatic Vault Integration**: Uses HashiCorp Vault for secure secret management when available
+- **Legacy Fallback**: Falls back to hardcoded secrets only when Vault is not available (with security warnings)
+- **Smart Detection**: Automatically detects and uses the most secure option available
+
 This script:
-- Checks prerequisites (minikube, kubectl, optional Docker/Podman)
+- Checks prerequisites (minikube, kubectl, optional Docker/Podman)  
 - Creates the `openfga-system` namespace if needed
-- Deploys PostgreSQL 14 with OpenFGA configuration
+- **Prioritizes Vault-managed PostgreSQL deployment** for secure secret management
+- Falls back to legacy PostgreSQL deployment with security warnings if Vault unavailable
 - Deploys the OpenFGA operator (unless `--skip-operator`)
-- Provides PostgreSQL connection details and next steps
+- Provides appropriate connection details and security guidance
+
+**Vault Integration Benefits:**
+- No hardcoded passwords in deployment manifests
+- Centralized secret management and rotation
+- Automatic secret synchronization to Kubernetes
+- Production-ready security practices
 
 ## Testing and Validation
 

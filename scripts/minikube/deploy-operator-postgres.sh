@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Deploy OpenFGA Operator with PostgreSQL datastore for Minikube
-# Automates the deployment of Postgres and ensures OpenFGA operator is ready
+# Automates the deployment of Postgres using HashiCorp Vault for secret management
 # Compatible with Linux and macOS, POSIX-compliant shell syntax
 
 set -euo pipefail
@@ -18,7 +18,9 @@ POSTGRES_NAMESPACE="openfga-system"
 POSTGRES_IMAGE="postgres:14"
 POSTGRES_DB="openfga"
 POSTGRES_USER="postgres"
-POSTGRES_PASSWORD="password"
+# SECURITY: No hardcoded password - using Vault-managed secrets
+# Default password only used if Vault integration is not available
+POSTGRES_PASSWORD_DEFAULT="CHANGE_ME_INSECURE"  
 POSTGRES_PORT=5432
 
 OPERATOR_NAMESPACE="openfga-system"
@@ -31,6 +33,47 @@ log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
+
+# Check if vault integration is available
+check_vault_available() {
+    # Check if vault kustomization exists
+    if [ -d "$PROJECT_ROOT/kustomize/base/vault" ]; then
+        log_info "HashiCorp Vault integration available - using secure secret management"
+        return 0
+    else
+        log_warning "HashiCorp Vault integration not available - falling back to legacy mode"
+        log_warning "⚠️  Legacy mode uses less secure secret management"
+        log_warning "Consider upgrading to vault-managed secrets for better security"
+        return 1
+    fi
+}
+
+# Deploy using vault-managed secrets (recommended)
+deploy_with_vault() {
+    log_info "Deploying PostgreSQL with HashiCorp Vault-managed secrets..."
+    
+    # Deploy vault infrastructure which includes PostgreSQL
+    log_info "Deploying Vault infrastructure..."
+    kubectl apply -k "$PROJECT_ROOT/kustomize/base/vault/"
+    
+    # Wait for vault to be ready
+    log_info "Waiting for Vault to be ready..."
+    kubectl wait --for=condition=available --timeout=300s deployment/vault -n "$POSTGRES_NAMESPACE"
+    
+    # Wait for VSO to be ready  
+    log_info "Waiting for Vault Secrets Operator to be ready..."
+    kubectl wait --for=condition=available --timeout=300s deployment/vault-secrets-operator -n "$POSTGRES_NAMESPACE"
+    
+    # Wait for PostgreSQL to be ready (deployed as part of vault kustomization)
+    log_info "Waiting for PostgreSQL to be ready..."
+    kubectl wait --for=condition=ready --timeout=300s statefulset/postgresql-openfga-vault -n "$POSTGRES_NAMESPACE"
+    
+    log_success "PostgreSQL deployed with Vault-managed secrets"
+    
+    # Update service references for vault-managed deployment
+    POSTGRES_DEPLOYMENT_NAME="postgresql-openfga-vault"
+    POSTGRES_SERVICE_NAME="postgresql-openfga-vault"
+}
 
 # Create namespace if it doesn't exist
 ensure_namespace() {
@@ -71,7 +114,10 @@ check_prerequisites() {
 }
 
 deploy_postgres() {
-    log_info "Deploying Postgres to Minikube..."
+    log_warning "⚠️  SECURITY WARNING: Using legacy PostgreSQL deployment with hardcoded secrets"
+    log_warning "This is NOT recommended for any environment"
+    log_warning "Consider using the vault-managed deployment for better security"
+    log_info "Deploying Postgres to Minikube with legacy secrets..."
 
     cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
@@ -98,7 +144,7 @@ spec:
         - name: POSTGRES_USER
           value: ${POSTGRES_USER}
         - name: POSTGRES_PASSWORD
-          value: ${POSTGRES_PASSWORD}
+          value: ${POSTGRES_PASSWORD_DEFAULT}  # ⚠️ INSECURE - change this!
         ports:
         - containerPort: ${POSTGRES_PORT}
         readinessProbe:
@@ -192,41 +238,70 @@ deploy_operator() {
 }
 
 print_connection_instructions() {
-    local datastore_uri="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_SERVICE_NAME}:${POSTGRES_PORT}/${POSTGRES_DB}"
-    
     echo ""
     echo "==========================================="
     echo "      DEPLOYMENT SUCCESSFUL!"
     echo "==========================================="
     echo ""
-    echo "📊 Postgres Database Information:"
+    echo "📊 PostgreSQL Database Information:"
     echo "   Service: ${POSTGRES_SERVICE_NAME}.${POSTGRES_NAMESPACE}.svc.cluster.local"
     echo "   Port: ${POSTGRES_PORT}"
     echo "   Database: ${POSTGRES_DB}"
     echo "   User: ${POSTGRES_USER}"
-    echo ""
-    echo "🔗 OpenFGA Datastore Connection:"
-    echo "   URI: ${datastore_uri}"
-    echo ""
-    echo "📝 To deploy an OpenFGA instance with Postgres:"
-    echo "   kubectl apply -f examples/postgres-openfga.yaml"
+    
+    if [ -d "$PROJECT_ROOT/kustomize/base/vault" ]; then
+        echo ""
+        echo "🔐 Security: Using HashiCorp Vault-managed secrets"
+        echo "   Secrets are managed securely through Vault"
+        echo "   Password: Retrieved from Kubernetes secret 'postgres-credentials'"
+        echo ""
+        echo "📋 To access Vault:"
+        echo "   kubectl port-forward -n ${POSTGRES_NAMESPACE} svc/vault 8200:8200 &"
+        echo "   export VAULT_ADDR=http://localhost:8200"
+        echo "   export VAULT_TOKEN=root"
+        echo "   vault kv get secret/databases/openfga-postgres"
+        echo ""
+        echo "📋 To rotate secrets:"
+        echo "   ./scripts/manage-vault-secrets.sh rotate-postgres"
+        echo ""
+        echo "📝 To deploy an OpenFGA instance with Vault secrets:"
+        echo "   kubectl apply -f examples/postgres-openfga-vault.yaml"
+    else
+        echo "   Password: ${POSTGRES_PASSWORD_DEFAULT} ⚠️  INSECURE - CHANGE THIS!"
+        echo ""
+        echo "⚠️  SECURITY WARNING: Using hardcoded password"
+        echo "   This is NOT secure for any environment"
+        echo "   Consider upgrading to vault-managed secrets"
+        local datastore_uri="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD_DEFAULT}@${POSTGRES_SERVICE_NAME}:${POSTGRES_PORT}/${POSTGRES_DB}"
+        echo ""
+        echo "🔗 Connection URI (INSECURE):"
+        echo "   ${datastore_uri}"
+        echo ""
+        echo "📝 To deploy an OpenFGA instance with hardcoded secrets (NOT RECOMMENDED):"
+        echo "   kubectl apply -f examples/postgres-openfga.yaml"
+    fi
+    
     echo ""
     echo "🌐 Access OpenFGA API:"
-    echo "   kubectl port-forward service/openfga-postgres-http 8080:8080"
+    echo "   kubectl port-forward service/openfga-*-http 8080:8080"
     echo "   Then access: http://localhost:8080"
     echo ""
     echo "🎮 Access OpenFGA Playground (if enabled):"
-    echo "   kubectl port-forward service/openfga-postgres-playground 3000:3000"
+    echo "   kubectl port-forward service/openfga-*-playground 3000:3000"
     echo "   Then access: http://localhost:3000"
     echo ""
     echo "🔧 Useful commands:"
-    echo "   - Check Postgres status: kubectl get pods -l app=postgres"
+    echo "   - Check PostgreSQL status: kubectl get pods -l app.kubernetes.io/name=postgresql -n ${POSTGRES_NAMESPACE}"
     echo "   - Check operator status: kubectl get pods -n ${OPERATOR_NAMESPACE}"
     echo "   - View operator logs: kubectl logs -n ${OPERATOR_NAMESPACE} -l app=openfga-operator"
     echo "   - List OpenFGA instances: kubectl get openfgas -A"
     echo ""
     echo "💡 Next steps:"
-    echo "   1. Deploy an OpenFGA instance: kubectl apply -f examples/postgres-openfga.yaml"
+    if [ -d "$PROJECT_ROOT/kustomize/base/vault" ]; then
+        echo "   1. Deploy an OpenFGA instance: kubectl apply -f examples/postgres-openfga-vault.yaml"
+    else
+        echo "   1. Deploy an OpenFGA instance: kubectl apply -f examples/postgres-openfga.yaml"
+    fi
     echo "   2. Validate deployment: ./scripts/minikube/validate-deployment.sh"
     echo "   3. Explore the demos in the demos/ directory"
     echo ""
@@ -241,18 +316,26 @@ cleanup_on_error() {
 show_help() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
-    echo "Deploy OpenFGA Operator with Postgres datastore to Minikube"
+    echo "Deploy OpenFGA Operator with PostgreSQL datastore to Minikube"
+    echo ""
+    echo "🔐 Security Modes:"
+    echo "  • Vault-managed (Recommended): Uses HashiCorp Vault for secure secret management"
+    echo "  • Legacy mode (Fallback): Uses hardcoded secrets (NOT recommended)"
     echo ""
     echo "Options:"
     echo "  -h, --help              Show this help message"
-    echo "  --postgres-password     Set Postgres password (default: password)"
     echo "  --postgres-db           Set Postgres database name (default: openfga)"
     echo "  --postgres-user         Set Postgres username (default: postgres)"
     echo "  --skip-operator         Deploy only Postgres, skip operator deployment"
     echo ""
+    echo "⚠️  Security Note:"
+    echo "  • Password management is handled automatically based on available integrations"
+    echo "  • Vault-managed secrets are used when HashiCorp Vault integration is available"
+    echo "  • Legacy hardcoded secrets are only used as fallback (NOT secure)"
+    echo ""
     echo "Examples:"
-    echo "  $0                                    # Deploy with defaults"
-    echo "  $0 --postgres-password mypass        # Use custom password"
+    echo "  $0                                    # Deploy with auto-detected security mode"
+    echo "  $0 --postgres-db mydb                # Use custom database name"
     echo "  $0 --skip-operator                   # Deploy only Postgres"
     echo ""
 }
@@ -264,10 +347,6 @@ main() {
             -h|--help)
                 show_help
                 exit 0
-                ;;
-            --postgres-password)
-                POSTGRES_PASSWORD="$2"
-                shift 2
                 ;;
             --postgres-db)
                 POSTGRES_DB="$2"
@@ -301,8 +380,14 @@ main() {
     # Main deployment flow
     check_prerequisites
     ensure_namespace
-    deploy_postgres
-    wait_for_postgres
+    
+    # Check if vault integration is available and use it preferentially
+    if check_vault_available; then
+        deploy_with_vault
+    else
+        deploy_postgres
+        wait_for_postgres
+    fi
     
     if [ "${SKIP_OPERATOR:-false}" != "true" ]; then
         if ! check_operator_deployment; then
