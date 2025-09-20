@@ -3,12 +3,18 @@ kind: OpenFGA
 metadata:
   name: openfga-postgres
   namespace: default
+  annotations:
+    # This example requires manual PostgreSQL deployment with secrets
+    # For Vault-managed secrets, use examples/postgres-openfga-vault.yaml
+    openfga.dev/requires-manual-setup: "true"
 spec:
   replicas: 3
   image: "openfga/openfga:v1.4.0"
   datastore:
     engine: "postgres"
-    uri: "postgresql://postgres:password@postgres-service:5432/openfga"
+    # SECURITY NOTE: Replace with proper secret-based URI
+    # Example: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres-service:5432/$(POSTGRES_DB)"
+    uri: "postgresql://postgres:CHANGE_ME_PASSWORD@postgres-service:5432/openfga"
   playground:
     enabled: true
     port: 3000
@@ -16,3 +22,22 @@ spec:
     port: 8081
   http:
     port: 8080
+  env:
+    - name: OPENFGA_LOG_LEVEL
+      value: "info"
+    # TODO: Add environment variables for database credentials from secrets
+    # - name: POSTGRES_USER
+    #   valueFrom:
+    #     secretKeyRef:
+    #       name: postgres-credentials
+    #       key: username
+    # - name: POSTGRES_PASSWORD
+    #   valueFrom:
+    #     secretKeyRef:
+    #       name: postgres-credentials
+    #       key: password
+    # - name: POSTGRES_DB
+    #   valueFrom:
+    #     secretKeyRef:
+    #       name: postgres-credentials
+    #       key: database
