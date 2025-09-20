@@ -1,7 +1,8 @@
 #!/bin/bash
 
-# deploy-operator-postgres.sh - Deploy OpenFGA Operator with Postgres datastore to Minikube
-# Compatible with Linux and macOS
+# Deploy OpenFGA Operator with PostgreSQL datastore for Minikube
+# Automates the deployment of Postgres and ensures OpenFGA operator is ready
+# Compatible with Linux and macOS, POSIX-compliant shell syntax
 
 set -euo pipefail
 
@@ -13,7 +14,7 @@ NC='\033[0m' # No Color
 
 POSTGRES_DEPLOYMENT_NAME="postgres"
 POSTGRES_SERVICE_NAME="postgres-service"
-POSTGRES_NAMESPACE="default"
+POSTGRES_NAMESPACE="openfga-system"
 POSTGRES_IMAGE="postgres:14"
 POSTGRES_DB="openfga"
 POSTGRES_USER="postgres"
@@ -22,6 +23,7 @@ POSTGRES_PORT=5432
 
 OPERATOR_NAMESPACE="openfga-system"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
 log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
@@ -29,6 +31,19 @@ log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
 log_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 
 command_exists() { command -v "$1" >/dev/null 2>&1; }
+
+# Create namespace if it doesn't exist
+ensure_namespace() {
+    log_info "Ensuring namespace '$POSTGRES_NAMESPACE' exists..."
+    
+    if kubectl get namespace "$POSTGRES_NAMESPACE" >/dev/null 2>&1; then
+        log_success "Namespace '$POSTGRES_NAMESPACE' already exists"
+    else
+        log_info "Creating namespace '$POSTGRES_NAMESPACE'..."
+        kubectl create namespace "$POSTGRES_NAMESPACE"
+        log_success "Namespace '$POSTGRES_NAMESPACE' created"
+    fi
+}
 
 check_prerequisites() {
     log_info "Checking prerequisites..."
@@ -285,6 +300,7 @@ main() {
     
     # Main deployment flow
     check_prerequisites
+    ensure_namespace
     deploy_postgres
     wait_for_postgres
     
