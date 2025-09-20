@@ -6,115 +6,79 @@
 
 set -euo pipefail
 
-# Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-# Configuration
-OPERATOR_NAMESPACE="openfga-system"
+POSTGRES_DEPLOYMENT_NAME="postgres"
+POSTGRES_SERVICE_NAME="postgres-service"
+POSTGRES_NAMESPACE="openfga-system"
 POSTGRES_IMAGE="postgres:14"
 POSTGRES_DB="openfga"
 POSTGRES_USER="postgres"
 POSTGRES_PASSWORD="password"
-POSTGRES_DEPLOYMENT_NAME="postgres"
-POSTGRES_SERVICE_NAME="postgres-service"
+POSTGRES_PORT=5432
+
+OPERATOR_NAMESPACE="openfga-system"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
-# Logging functions
-log_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
+log_info()    { echo -e "${BLUE}[INFO]${NC} $1"; }
+log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
+log_error()   { echo -e "${RED}[ERROR]${NC} $1"; }
 
-log_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Check if command exists
-command_exists() {
-    command -v "$1" >/dev/null 2>&1
-}
-
-# Check prerequisites
-check_prerequisites() {
-    log_info "Checking prerequisites..."
-    
-    if ! command_exists minikube; then
-        log_error "Minikube is not installed. Please install Minikube first."
-        exit 1
-    fi
-    
-    if ! command_exists kubectl; then
-        log_error "kubectl is not installed. Please install kubectl first."
-        exit 1
-    fi
-    
-    if ! minikube status >/dev/null 2>&1; then
-        log_error "Minikube is not running. Please start Minikube first: minikube start"
-        exit 1
-    fi
-    
-    # Check for any container runtime (Docker or Podman) - helpful but not required for registry-based deployment
-    if command_exists docker; then
-        log_info "Using container runtime: docker"
-    elif command_exists podman; then
-        log_info "Using container runtime: podman"
-    else
-        log_warning "No container runtime (Docker or Podman) found. Registry-based operator deployment will be used."
-    fi
-    
-    log_success "All prerequisites satisfied"
-}
+command_exists() { command -v "$1" >/dev/null 2>&1; }
 
 # Create namespace if it doesn't exist
 ensure_namespace() {
-    log_info "Ensuring namespace '$OPERATOR_NAMESPACE' exists..."
+    log_info "Ensuring namespace '$POSTGRES_NAMESPACE' exists..."
     
-    if kubectl get namespace "$OPERATOR_NAMESPACE" >/dev/null 2>&1; then
-        log_success "Namespace '$OPERATOR_NAMESPACE' already exists"
+    if kubectl get namespace "$POSTGRES_NAMESPACE" >/dev/null 2>&1; then
+        log_success "Namespace '$POSTGRES_NAMESPACE' already exists"
     else
-        log_info "Creating namespace '$OPERATOR_NAMESPACE'..."
-        kubectl create namespace "$OPERATOR_NAMESPACE"
-        log_success "Namespace '$OPERATOR_NAMESPACE' created"
+        log_info "Creating namespace '$POSTGRES_NAMESPACE'..."
+        kubectl create namespace "$POSTGRES_NAMESPACE"
+        log_success "Namespace '$POSTGRES_NAMESPACE' created"
     fi
 }
 
-# Deploy PostgreSQL
-deploy_postgres() {
-    log_info "Deploying PostgreSQL in namespace '$OPERATOR_NAMESPACE'..."
-    
-    # Check if PostgreSQL is already deployed
-    if kubectl get deployment "$POSTGRES_DEPLOYMENT_NAME" -n "$OPERATOR_NAMESPACE" >/dev/null 2>&1; then
-        log_warning "PostgreSQL deployment '$POSTGRES_DEPLOYMENT_NAME' already exists"
-        log_info "Checking if PostgreSQL is ready..."
-        if kubectl wait --for=condition=available --timeout=30s deployment/"$POSTGRES_DEPLOYMENT_NAME" -n "$OPERATOR_NAMESPACE" >/dev/null 2>&1; then
-            log_success "PostgreSQL is already ready"
-            return 0
-        else
-            log_warning "PostgreSQL exists but may not be ready yet"
-        fi
+check_prerequisites() {
+    log_info "Checking prerequisites..."
+    if ! command_exists minikube; then
+        log_error "Minikube is not installed."
+        exit 1
+    fi
+    if ! command_exists kubectl; then
+        log_error "kubectl is not installed."
+        exit 1
+    fi
+    if ! minikube status >/dev/null 2>&1; then
+        log_error "Minikube is not running. Please start Minikube first."
+        exit 1
+    fi
+    local runtime
+    if command_exists docker && docker info >/dev/null 2>&1; then
+        runtime="docker"
+    elif command_exists podman && podman info >/dev/null 2>&1; then
+        runtime="podman"
     else
-        # Deploy PostgreSQL
-        log_info "Creating PostgreSQL deployment and service..."
-        kubectl apply -f - <<EOF
+        log_warning "No container runtime (Docker/Podman) found. Continuing, but builds may fail."
+    fi
+    log_success "Prerequisites check passed."
+}
+
+deploy_postgres() {
+    log_info "Deploying Postgres to Minikube..."
+
+    cat <<EOF | kubectl apply -f -
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: $POSTGRES_DEPLOYMENT_NAME
-  namespace: $OPERATOR_NAMESPACE
-  labels:
-    app: postgres
+  name: ${POSTGRES_DEPLOYMENT_NAME}
+  namespace: ${POSTGRES_NAMESPACE}
 spec:
   replicas: 1
   selector:
@@ -127,262 +91,231 @@ spec:
     spec:
       containers:
       - name: postgres
-        image: $POSTGRES_IMAGE
+        image: ${POSTGRES_IMAGE}
         env:
         - name: POSTGRES_DB
-          value: $POSTGRES_DB
+          value: ${POSTGRES_DB}
         - name: POSTGRES_USER
-          value: $POSTGRES_USER
+          value: ${POSTGRES_USER}
         - name: POSTGRES_PASSWORD
-          value: $POSTGRES_PASSWORD
-        - name: PGDATA
-          value: /var/lib/postgresql/data/pgdata
+          value: ${POSTGRES_PASSWORD}
         ports:
-        - containerPort: 5432
-        volumeMounts:
-        - name: postgres-storage
-          mountPath: /var/lib/postgresql/data
+        - containerPort: ${POSTGRES_PORT}
         readinessProbe:
           exec:
             command:
-            - pg_isready
-            - -U
-            - $POSTGRES_USER
-            - -d
-            - $POSTGRES_DB
-          initialDelaySeconds: 10
+            - sh
+            - -c
+            - "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+          initialDelaySeconds: 5
           periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
         livenessProbe:
           exec:
             command:
-            - pg_isready
-            - -U
-            - $POSTGRES_USER
-            - -d
-            - $POSTGRES_DB
+            - sh
+            - -c
+            - "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
           initialDelaySeconds: 30
           periodSeconds: 10
-      volumes:
-      - name: postgres-storage
-        emptyDir: {}
+          timeoutSeconds: 5
+          failureThreshold: 3
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: $POSTGRES_SERVICE_NAME
-  namespace: $OPERATOR_NAMESPACE
-  labels:
-    app: postgres
+  name: ${POSTGRES_SERVICE_NAME}
+  namespace: ${POSTGRES_NAMESPACE}
 spec:
   selector:
     app: postgres
   ports:
-  - port: 5432
-    targetPort: 5432
-    protocol: TCP
-  type: ClusterIP
+  - port: ${POSTGRES_PORT}
+    targetPort: ${POSTGRES_PORT}
 EOF
-        log_success "PostgreSQL deployment and service created"
+
+    log_success "Postgres deployment and service created."
+}
+
+wait_for_postgres() {
+    log_info "Waiting for Postgres to be ready..."
+    
+    # Wait for deployment to be available
+    if kubectl wait --for=condition=available --timeout=300s deployment/${POSTGRES_DEPLOYMENT_NAME} -n ${POSTGRES_NAMESPACE}; then
+        log_success "Postgres deployment is available."
+    else
+        log_error "Postgres deployment failed to become available within 5 minutes."
+        exit 1
     fi
     
-    # Wait for PostgreSQL to be ready
-    log_info "Waiting for PostgreSQL to become ready (this may take a few minutes)..."
-    if kubectl wait --for=condition=available --timeout=300s deployment/"$POSTGRES_DEPLOYMENT_NAME" -n "$OPERATOR_NAMESPACE"; then
-        log_success "PostgreSQL is ready"
+    # Additional check for pod readiness
+    log_info "Waiting for Postgres pod to be ready..."
+    if kubectl wait --for=condition=ready --timeout=60s pod -l app=postgres -n ${POSTGRES_NAMESPACE}; then
+        log_success "Postgres pod is ready."
     else
-        log_error "PostgreSQL failed to become ready within 5 minutes"
-        log_info "Checking pod status for debugging..."
-        kubectl get pods -n "$OPERATOR_NAMESPACE" -l app=postgres
-        kubectl describe pods -n "$OPERATOR_NAMESPACE" -l app=postgres
-        return 1
+        log_error "Postgres pod failed to become ready."
+        exit 1
     fi
 }
 
-# Check if OpenFGA operator is deployed
 check_operator_deployment() {
-    log_info "Checking if OpenFGA operator is deployed..."
+    log_info "Checking if OpenFGA operator is already deployed..."
     
-    if kubectl get deployment openfga-operator -n "$OPERATOR_NAMESPACE" >/dev/null 2>&1; then
-        log_success "OpenFGA operator is already deployed"
-        
-        # Check if it's ready
-        if kubectl wait --for=condition=available --timeout=30s deployment/openfga-operator -n "$OPERATOR_NAMESPACE" >/dev/null 2>&1; then
-            log_success "OpenFGA operator is ready"
+    if kubectl get namespace ${OPERATOR_NAMESPACE} >/dev/null 2>&1; then
+        if kubectl get deployment -n ${OPERATOR_NAMESPACE} | grep -q openfga-operator; then
+            log_info "OpenFGA operator is already deployed."
             return 0
-        else
-            log_warning "OpenFGA operator exists but may not be ready yet"
-            return 1
         fi
-    else
-        log_info "OpenFGA operator is not deployed"
-        return 1
     fi
+    
+    return 1
 }
 
-# Deploy OpenFGA operator
 deploy_operator() {
     log_info "Deploying OpenFGA operator..."
     
-    local deploy_script="$SCRIPT_DIR/deploy-operator.sh"
+    local deploy_script="${SCRIPT_DIR}/deploy-operator.sh"
     
     if [ ! -f "$deploy_script" ]; then
-        log_error "Deploy operator script not found at: $deploy_script"
-        return 1
+        log_error "deploy-operator.sh not found at $deploy_script"
+        exit 1
     fi
     
-    log_info "Running deploy-operator.sh in non-interactive mode..."
-    
-    # Run the operator deployment script in non-interactive registry mode
-    if "$deploy_script" --registry-deploy; then
-        log_success "OpenFGA operator deployed successfully"
-        return 0
+    # Run the deploy-operator.sh script in non-interactive mode
+    if "$deploy_script" --non-interactive --deployment-mode registry; then
+        log_success "OpenFGA operator deployed successfully."
     else
-        log_error "Failed to deploy OpenFGA operator"
-        return 1
+        log_error "Failed to deploy OpenFGA operator."
+        exit 1
     fi
 }
 
-# Wait for operator to be fully ready
-wait_for_operator() {
-    log_info "Waiting for OpenFGA operator to be fully ready..."
+print_connection_instructions() {
+    local datastore_uri="postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_SERVICE_NAME}:${POSTGRES_PORT}/${POSTGRES_DB}"
     
-    # Wait for deployment to be available
-    if kubectl wait --for=condition=available --timeout=300s deployment/openfga-operator -n "$OPERATOR_NAMESPACE"; then
-        log_success "OpenFGA operator deployment is available"
-    else
-        log_error "OpenFGA operator failed to become available within 5 minutes"
-        return 1
-    fi
-    
-    # Check if CRDs are installed
-    if kubectl get crd openfgas.authorization.openfga.dev >/dev/null 2>&1; then
-        log_success "OpenFGA CRDs are installed"
-    else
-        log_error "OpenFGA CRDs are not installed"
-        return 1
-    fi
-    
-    log_success "OpenFGA operator is fully ready"
-}
-
-# Show success information and next steps
-show_success_info() {
     echo ""
-    echo "=========================================="
-    echo "Deployment Completed Successfully!"
-    echo "=========================================="
+    echo "==========================================="
+    echo "      DEPLOYMENT SUCCESSFUL!"
+    echo "==========================================="
     echo ""
-    echo "✓ PostgreSQL deployed in namespace: $OPERATOR_NAMESPACE"
-    echo "✓ OpenFGA operator deployed and ready"
+    echo "📊 Postgres Database Information:"
+    echo "   Service: ${POSTGRES_SERVICE_NAME}.${POSTGRES_NAMESPACE}.svc.cluster.local"
+    echo "   Port: ${POSTGRES_PORT}"
+    echo "   Database: ${POSTGRES_DB}"
+    echo "   User: ${POSTGRES_USER}"
     echo ""
-    echo "PostgreSQL Connection Details:"
-    echo "  Host: $POSTGRES_SERVICE_NAME.$OPERATOR_NAMESPACE.svc.cluster.local"
-    echo "  Port: 5432"
-    echo "  Database: $POSTGRES_DB"
-    echo "  Username: $POSTGRES_USER"
-    echo "  Password: $POSTGRES_PASSWORD"
-    echo "  Connection URI: postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@$POSTGRES_SERVICE_NAME.$OPERATOR_NAMESPACE.svc.cluster.local:5432/$POSTGRES_DB"
+    echo "🔗 OpenFGA Datastore Connection:"
+    echo "   URI: ${datastore_uri}"
     echo ""
-    echo "Next steps:"
-    echo "1. Deploy a PostgreSQL-backed OpenFGA instance:"
-    echo "   kubectl apply -f - <<EOF"
-    echo "   apiVersion: authorization.openfga.dev/v1alpha1"
-    echo "   kind: OpenFGA"
-    echo "   metadata:"
-    echo "     name: openfga-postgres"
-    echo "     namespace: $OPERATOR_NAMESPACE"
-    echo "   spec:"
-    echo "     replicas: 1"
-    echo "     image: \"openfga/openfga:v1.4.0\""
-    echo "     datastore:"
-    echo "       engine: \"postgres\""
-    echo "       uri: \"postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@$POSTGRES_SERVICE_NAME:5432/$POSTGRES_DB\""
-    echo "     playground:"
-    echo "       enabled: true"
-    echo "       port: 3000"
-    echo "     grpc:"
-    echo "       port: 8081"
-    echo "     http:"
-    echo "       port: 8080"
-    echo "   EOF"
+    echo "📝 To deploy an OpenFGA instance with Postgres:"
+    echo "   kubectl apply -f examples/postgres-openfga.yaml"
     echo ""
-    echo "2. Validate deployment: ./scripts/minikube/validate-deployment.sh"
-    echo "3. Access OpenFGA API: kubectl port-forward service/openfga-postgres-http 8080:8080 -n $OPERATOR_NAMESPACE"
-    echo "4. Deploy demo applications: cd demos/banking-app && kubectl apply -f k8s/"
+    echo "🌐 Access OpenFGA API:"
+    echo "   kubectl port-forward service/openfga-postgres-http 8080:8080"
+    echo "   Then access: http://localhost:8080"
     echo ""
-    echo "Useful commands:"
-    echo "- Check PostgreSQL status: kubectl get pods -n $OPERATOR_NAMESPACE -l app=postgres"
-    echo "- Check operator status: kubectl get pods -n $OPERATOR_NAMESPACE -l app=openfga-operator"
-    echo "- View PostgreSQL logs: kubectl logs -n $OPERATOR_NAMESPACE -l app=postgres"
-    echo "- View operator logs: kubectl logs -n $OPERATOR_NAMESPACE -l app=openfga-operator"
-    echo "- List OpenFGA instances: kubectl get openfgas -A"
+    echo "🎮 Access OpenFGA Playground (if enabled):"
+    echo "   kubectl port-forward service/openfga-postgres-playground 3000:3000"
+    echo "   Then access: http://localhost:3000"
+    echo ""
+    echo "🔧 Useful commands:"
+    echo "   - Check Postgres status: kubectl get pods -l app=postgres"
+    echo "   - Check operator status: kubectl get pods -n ${OPERATOR_NAMESPACE}"
+    echo "   - View operator logs: kubectl logs -n ${OPERATOR_NAMESPACE} -l app=openfga-operator"
+    echo "   - List OpenFGA instances: kubectl get openfgas -A"
+    echo ""
+    echo "💡 Next steps:"
+    echo "   1. Deploy an OpenFGA instance: kubectl apply -f examples/postgres-openfga.yaml"
+    echo "   2. Validate deployment: ./scripts/minikube/validate-deployment.sh"
+    echo "   3. Explore the demos in the demos/ directory"
     echo ""
 }
 
-# Show usage information
-show_usage() {
+cleanup_on_error() {
+    log_warning "Cleaning up due to error..."
+    kubectl delete deployment ${POSTGRES_DEPLOYMENT_NAME} -n ${POSTGRES_NAMESPACE} 2>/dev/null || true
+    kubectl delete service ${POSTGRES_SERVICE_NAME} -n ${POSTGRES_NAMESPACE} 2>/dev/null || true
+}
+
+show_help() {
     echo "Usage: $0 [OPTIONS]"
     echo ""
-    echo "Deploy PostgreSQL datastore and OpenFGA operator to Minikube"
+    echo "Deploy OpenFGA Operator with Postgres datastore to Minikube"
     echo ""
     echo "Options:"
-    echo "  --help              Show this help message"
-    echo "  --skip-operator     Deploy only PostgreSQL, skip operator deployment"
+    echo "  -h, --help              Show this help message"
+    echo "  --postgres-password     Set Postgres password (default: password)"
+    echo "  --postgres-db           Set Postgres database name (default: openfga)"
+    echo "  --postgres-user         Set Postgres username (default: postgres)"
+    echo "  --skip-operator         Deploy only Postgres, skip operator deployment"
     echo ""
-    echo "This script will:"
-    echo "1. Check prerequisites (minikube, kubectl)"
-    echo "2. Create '$OPERATOR_NAMESPACE' namespace if needed"
-    echo "3. Deploy PostgreSQL with OpenFGA configuration"
-    echo "4. Deploy OpenFGA operator (unless --skip-operator)"
-    echo "5. Wait for all components to be ready"
+    echo "Examples:"
+    echo "  $0                                    # Deploy with defaults"
+    echo "  $0 --postgres-password mypass        # Use custom password"
+    echo "  $0 --skip-operator                   # Deploy only Postgres"
     echo ""
 }
 
-# Main function
 main() {
-    echo ""
-    echo "=========================================="
-    echo "OpenFGA Operator with PostgreSQL Deployment"
-    echo "=========================================="
-    echo ""
-    
     # Parse command line arguments
-    local skip_operator=false
-    
     while [ $# -gt 0 ]; do
         case $1 in
-            --skip-operator)
-                skip_operator=true
-                shift
-                ;;
-            --help)
-                show_usage
+            -h|--help)
+                show_help
                 exit 0
+                ;;
+            --postgres-password)
+                POSTGRES_PASSWORD="$2"
+                shift 2
+                ;;
+            --postgres-db)
+                POSTGRES_DB="$2"
+                shift 2
+                ;;
+            --postgres-user)
+                POSTGRES_USER="$2"
+                shift 2
+                ;;
+            --skip-operator)
+                SKIP_OPERATOR=true
+                shift
                 ;;
             *)
                 log_error "Unknown option: $1"
-                show_usage
+                show_help
                 exit 1
                 ;;
         esac
     done
     
-    # Execute deployment steps
+    # Set up error handling
+    trap cleanup_on_error ERR
+    
+    echo ""
+    echo "==========================================="
+    echo "  OpenFGA Operator + Postgres Deployment"
+    echo "==========================================="
+    echo ""
+    
+    # Main deployment flow
     check_prerequisites
     ensure_namespace
     deploy_postgres
+    wait_for_postgres
     
-    if [ "$skip_operator" = "false" ]; then
+    if [ "${SKIP_OPERATOR:-false}" != "true" ]; then
         if ! check_operator_deployment; then
             deploy_operator
         fi
-        wait_for_operator
-    else
-        log_info "Skipping operator deployment (--skip-operator specified)"
     fi
     
-    show_success_info
+    print_connection_instructions
+    
+    log_success "Deployment completed successfully!"
 }
 
-# Run main function
-main "$@"
+# Only run main if script is executed directly (not sourced)
+if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
+    main "$@"
+fi
