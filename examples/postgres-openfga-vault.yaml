@@ -1,0 +1,44 @@
+apiVersion: authorization.openfga.dev/v1alpha1
+kind: OpenFGA
+metadata:
+  name: openfga-vault
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: openfga
+    app.kubernetes.io/component: authorization-server
+    app.kubernetes.io/instance: vault-managed
+  annotations:
+    secrets.hashicorp.com/agent-inject: "false"
+spec:
+  replicas: 3
+  image: "openfga/openfga:v1.4.0"
+  datastore:
+    engine: "postgres"
+    uri: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgresql-openfga-vault:5432/$(POSTGRES_DB)"
+  playground:
+    enabled: true
+    port: 3000
+  grpc:
+    port: 8081
+  http:
+    port: 8080
+  env:
+    - name: POSTGRES_USER
+      valueFrom:
+        secretKeyRef:
+          name: postgres-credentials
+          key: username
+    - name: POSTGRES_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: postgres-credentials
+          key: password
+    - name: POSTGRES_DB
+      valueFrom:
+        secretKeyRef:
+          name: postgres-credentials
+          key: database
+    - name: OPENFGA_LOG_LEVEL
+      value: "info"
+    - name: OPENFGA_LOG_FORMAT
+      value: "json"

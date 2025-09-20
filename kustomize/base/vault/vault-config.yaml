@@ -1,0 +1,68 @@
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultConnection
+metadata:
+  name: vault-connection
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/component: connection
+spec:
+  # Connect to local vault service
+  address: http://vault:8200
+  tlsConfig:
+    skipVerify: true
+---
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultAuth
+metadata:
+  name: vault-auth
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/component: auth
+spec:
+  vaultConnectionRef: vault-connection
+  method: kubernetes
+  mount: auth/kubernetes
+  kubernetes:
+    role: openfga-role
+    serviceAccount: vault-secrets-operator
+    audiences:
+      - vault
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: vault-token
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/component: token
+type: Opaque
+stringData:
+  token: root  # For development only
+---
+apiVersion: secrets.hashicorp.com/v1beta1
+kind: VaultStaticSecret
+metadata:
+  name: postgres-credentials
+  namespace: openfga-system
+  labels:
+    app.kubernetes.io/name: vault
+    app.kubernetes.io/component: postgres-secret
+spec:
+  vaultAuthRef: vault-auth
+  mount: secret
+  path: databases/openfga-postgres
+  refreshAfter: 1h
+  destination:
+    name: postgres-credentials
+    create: true
+    overwrite: true
+    labels:
+      app.kubernetes.io/name: postgresql
+      app.kubernetes.io/component: database
+    type: Opaque
+  rolloutRestartTargets:
+    - kind: StatefulSet
+      name: postgresql-openfga

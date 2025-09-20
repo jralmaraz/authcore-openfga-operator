@@ -1,0 +1,38 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+metadata:
+  name: vault
+  annotations:
+    config.kubernetes.io/local-config: "true"
+
+namespace: openfga-system
+
+resources:
+- vault-crds.yaml
+- vault-deployment.yaml
+- vault-secrets-operator.yaml
+- vault-config.yaml
+- postgresql-vault.yaml
+
+labels:
+- includeSelectors: true
+  pairs:
+    app.kubernetes.io/part-of: openfga-platform
+    vault.hashicorp.com/agent-inject: "false"
+
+commonLabels:
+  app.kubernetes.io/managed-by: kustomize
+  app.kubernetes.io/version: v1.0.0
+
+images:
+- name: hashicorp/vault
+  newTag: 1.15.2
+- name: hashicorp/vault-secrets-operator
+  newTag: 0.4.3
+
+replicas:
+- name: vault
+  count: 1
+- name: vault-secrets-operator
+  count: 1

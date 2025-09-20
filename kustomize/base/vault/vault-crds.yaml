@@ -1,0 +1,207 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: vaultauths.secrets.hashicorp.com
+  labels:
+    app.kubernetes.io/name: vault-secrets-operator
+spec:
+  group: secrets.hashicorp.com
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              vaultConnectionRef:
+                type: string
+              method:
+                type: string
+              mount:
+                type: string
+              params:
+                type: object
+                additionalProperties:
+                  type: string
+              headers:
+                type: object
+                additionalProperties:
+                  type: string
+              kubernetes:
+                type: object
+                properties:
+                  role:
+                    type: string
+                  serviceAccount:
+                    type: string
+                  tokenExpirationSeconds:
+                    type: integer
+                  tokenReviewerJwt:
+                    type: string
+                  audiences:
+                    type: array
+                    items:
+                      type: string
+          status:
+            type: object
+            properties:
+              valid:
+                type: boolean
+              error:
+                type: string
+    subresources:
+      status: {}
+  scope: Namespaced
+  names:
+    plural: vaultauths
+    singular: vaultauth
+    kind: VaultAuth
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: vaultconnections.secrets.hashicorp.com
+  labels:
+    app.kubernetes.io/name: vault-secrets-operator
+spec:
+  group: secrets.hashicorp.com
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              address:
+                type: string
+              tlsConfig:
+                type: object
+                properties:
+                  skipVerify:
+                    type: boolean
+                  serverName:
+                    type: string
+                  caCertSecretRef:
+                    type: string
+              headers:
+                type: object
+                additionalProperties:
+                  type: string
+          status:
+            type: object
+            properties:
+              valid:
+                type: boolean
+              error:
+                type: string
+    subresources:
+      status: {}
+  scope: Namespaced
+  names:
+    plural: vaultconnections
+    singular: vaultconnection
+    kind: VaultConnection
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: vaultstaticsecrets.secrets.hashicorp.com
+  labels:
+    app.kubernetes.io/name: vault-secrets-operator
+spec:
+  group: secrets.hashicorp.com
+  versions:
+  - name: v1beta1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            properties:
+              vaultAuthRef:
+                type: string
+              mount:
+                type: string
+              path:
+                type: string
+              version:
+                type: integer
+              refreshAfter:
+                type: string
+              destination:
+                type: object
+                properties:
+                  name:
+                    type: string
+                  create:
+                    type: boolean
+                  overwrite:
+                    type: boolean
+                  labels:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  annotations:
+                    type: object
+                    additionalProperties:
+                      type: string
+                  type:
+                    type: string
+                  transformation:
+                    type: object
+                    properties:
+                      excludes:
+                        type: array
+                        items:
+                          type: string
+                      includes:
+                        type: array
+                        items:
+                          type: string
+                      excludeRaw:
+                        type: boolean
+                      templates:
+                        type: object
+                        additionalProperties:
+                          type: object
+                          properties:
+                            name:
+                              type: string
+                            text:
+                              type: string
+              rolloutRestartTargets:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    kind:
+                      type: string
+                    name:
+                      type: string
+          status:
+            type: object
+            properties:
+              secretMAC:
+                type: string
+              lastGeneration:
+                type: integer
+              error:
+                type: string
+    subresources:
+      status: {}
+  scope: Namespaced
+  names:
+    plural: vaultstaticsecrets
+    singular: vaultstaticsecret
+    kind: VaultStaticSecret

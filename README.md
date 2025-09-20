@@ -110,6 +110,59 @@ For local development and testing, use our comprehensive Minikube guides:
 - **[Linux Guide](docs/minikube/setup-linux.md)** - Step-by-step setup for Linux
 - **[Windows Guide](docs/minikube/setup-windows.md)** - Step-by-step setup for Windows
 
+### 🔐 HashiCorp Vault Integration
+
+The OpenFGA Operator now supports HashiCorp Vault for secure secrets management in local development environments:
+
+- **[HashiCorp Vault Guide](docs/vault/HASHICORP_VAULT.md)** - Complete Vault integration setup
+- **Auto-unseal Development Setup** - Ready-to-use Vault configuration for local dev
+- **Vault Secrets Operator (VSO)** - Automatic secret synchronization to Kubernetes
+- **PostgreSQL Secret Management** - Database credentials managed through Vault
+- **One-command Deployment** - Automated setup script for complete environment
+
+#### Quick Vault Setup
+
+Deploy a complete development environment with HashiCorp Vault:
+
+```bash
+# Complete automated deployment with Vault
+./scripts/deploy-minikube-vault.sh
+```
+
+This script provides:
+- **HashiCorp Vault** with auto-unseal for development
+- **Vault Secrets Operator (VSO)** for automatic secret sync
+- **PostgreSQL with Vault-managed secrets** instead of hardcoded passwords
+- **OpenFGA with secure database connections** using Vault secrets
+- **Demo secrets initialization** for immediate development
+- **Port forwarding setup** for easy access to all services
+
+#### Manual Secret Management
+
+Use the provided secret management script for easy Vault operations:
+
+```bash
+# Initialize Vault with demo secrets
+./scripts/manage-vault-secrets.sh init
+
+# View current PostgreSQL credentials
+./scripts/manage-vault-secrets.sh get-postgres
+
+# Update PostgreSQL password
+./scripts/manage-vault-secrets.sh set-postgres --username myuser --password newpass
+
+# Rotate PostgreSQL password automatically
+./scripts/manage-vault-secrets.sh rotate-postgres
+
+# Check Vault and Kubernetes status
+./scripts/manage-vault-secrets.sh status
+```
+
+**Access URLs:**
+- Vault UI: http://localhost:8200/ui (token: `root`)
+- OpenFGA API: http://localhost:8080
+- OpenFGA Playground: http://localhost:3000
+
 #### Automated Setup Scripts
 
 For reliable deployment, we recommend using our consolidated deployment script with comprehensive container runtime support:
